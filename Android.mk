@@ -15,7 +15,6 @@
 # Default values for the USE flags. Override these USE flags from your product
 # by setting BRILLO_USE_* values. Note that we define local variables like
 # local_use_* to prevent leaking our default setting for other packages.
-local_use_dbus := $(if $(BRILLO_USE_DBUS),$(BRILLO_USE_DBUS),0)
 
 LOCAL_PATH := $(call my-dir)
 
@@ -50,21 +49,6 @@ libbrillo_linux_sources := \
 
 libbrillo_binder_sources := \
     brillo/binder_watcher.cc \
-
-libbrillo_dbus_sources := \
-    brillo/any.cc \
-    brillo/daemons/dbus_daemon.cc \
-    brillo/dbus/async_event_sequencer.cc \
-    brillo/dbus/data_serialization.cc \
-    brillo/dbus/dbus_connection.cc \
-    brillo/dbus/dbus_method_invoker.cc \
-    brillo/dbus/dbus_method_response.cc \
-    brillo/dbus/dbus_object.cc \
-    brillo/dbus/dbus_service_watcher.cc \
-    brillo/dbus/dbus_signal.cc \
-    brillo/dbus/exported_object_manager.cc \
-    brillo/dbus/exported_property_set.cc \
-    brillo/dbus/utils.cc \
 
 libbrillo_http_sources := \
     brillo/http/curl_api.cc \
@@ -132,26 +116,9 @@ libbrillo_test_sources := \
     brillo/url_utils_unittest.cc \
     brillo/value_conversion_unittest.cc \
 
-libbrillo_dbus_test_sources := \
-    brillo/any_unittest.cc \
-    brillo/any_internal_impl_unittest.cc \
-    brillo/dbus/async_event_sequencer_unittest.cc \
-    brillo/dbus/data_serialization_unittest.cc \
-    brillo/dbus/dbus_method_invoker_unittest.cc \
-    brillo/dbus/dbus_object_unittest.cc \
-    brillo/dbus/dbus_param_reader_unittest.cc \
-    brillo/dbus/dbus_param_writer_unittest.cc \
-    brillo/dbus/dbus_signal_handler_unittest.cc \
-    brillo/dbus/exported_object_manager_unittest.cc \
-    brillo/dbus/exported_property_set_unittest.cc \
-    brillo/dbus/test.proto \
-    brillo/type_name_undecorate_unittest.cc \
-    brillo/variant_dictionary_unittest.cc \
-
 libbrillo_CFLAGS := \
     -Wall \
-    -Werror \
-    -DUSE_DBUS=$(local_use_dbus)
+    -Werror
 libbrillo_CPPFLAGS :=
 libbrillo_includes :=
 libbrillo_shared_libraries := libchrome
@@ -189,26 +156,6 @@ LOCAL_CPPFLAGS := $(libbrillo_CPPFLAGS)
 LOCAL_CLANG := true
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)
 include $(BUILD_SHARED_LIBRARY)
-
-ifeq ($(local_use_dbus),1)
-
-# Shared dbus library for target
-# ========================================================
-include $(CLEAR_VARS)
-LOCAL_CPP_EXTENSION := $(libbrillo_cpp_extension)
-LOCAL_MODULE := libbrillo-dbus
-LOCAL_SRC_FILES := $(libbrillo_dbus_sources)
-LOCAL_C_INCLUDES := $(libbrillo_includes)
-LOCAL_SHARED_LIBRARIES := $(libbrillo_shared_libraries) libbrillo \
-    libchrome-dbus libdbus
-LOCAL_STATIC_LIBRARIES := libgtest_prod
-LOCAL_CFLAGS := $(libbrillo_CFLAGS)
-LOCAL_CPPFLAGS := $(libbrillo_CPPFLAGS)
-LOCAL_CLANG := true
-LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH) external/dbus
-include $(BUILD_SHARED_LIBRARY)
-
-endif  # local_use_dbus == 1
 
 # Shared minijail library for target
 # ========================================================
@@ -389,11 +336,6 @@ LOCAL_STATIC_LIBRARIES := libgtest libchrome_test_helpers \
     libbrillo-test-helpers libgmock libBionicGtestMain
 LOCAL_SHARED_LIBRARIES := $(libbrillo_shared_libraries) libbrillo libcurl \
     libbrillo-http libbrillo-stream libcrypto libprotobuf-cpp-lite
-ifeq ($(local_use_dbus),1)
-LOCAL_SRC_FILES += $(libbrillo_dbus_test_sources)
-LOCAL_STATIC_LIBRARIES += libchrome_dbus_test_helpers
-LOCAL_SHARED_LIBRARIES += libbrillo-dbus libchrome-dbus libdbus
-endif  # local_use_dbus == 1
 LOCAL_CFLAGS := $(libbrillo_CFLAGS)
 LOCAL_CPPFLAGS := $(libbrillo_CPPFLAGS) -Wno-sign-compare
 LOCAL_CLANG := true

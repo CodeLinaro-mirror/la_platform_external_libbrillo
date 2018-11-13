@@ -276,12 +276,12 @@ cc_library_static {
 cc_test {
     name: "libbrillo_test",
     srcs: libbrillo_test_sources,
+    isolated: true,
     static_libs: [
         "libgtest",
         "libchrome_test_helpers",
         "libbrillo-test-helpers",
         "libgmock",
-        "libBionicGtestMain",
     ],
     shared_libs: libbrillo_shared_libraries + [
         "libbrillo",

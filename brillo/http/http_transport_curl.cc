@@ -31,7 +31,7 @@ namespace curl {
 // This is a class that stores connection data on particular CURL socket
 // and provides file descriptor watcher to monitor read and/or write operations
 // on the socket's file descriptor.
-class Transport::SocketPollData : public base::MessageLoopForIO::Watcher {
+class Transport::SocketPollData : public base::MessagePumpForIO::FdWatcher {
  public:
   SocketPollData(const std::shared_ptr<CurlInterface>& curl_interface,
                  CURLM* curl_multi_handle,
@@ -44,12 +44,12 @@ class Transport::SocketPollData : public base::MessageLoopForIO::Watcher {
         file_descriptor_watcher_(FROM_HERE) {}
 
   // Returns the pointer for the socket-specific file descriptor watcher.
-  base::MessageLoopForIO::FileDescriptorWatcher* GetWatcher() {
+  base::MessagePumpForIO::FdWatchController* GetWatcher() {
     return &file_descriptor_watcher_;
   }
 
  private:
-  // Overrides from base::MessageLoopForIO::Watcher.
+  // Overrides from base::MessagePumpForIO::Watcher.
   void OnFileCanReadWithoutBlocking(int fd) override {
     OnSocketReady(fd, CURL_CSELECT_IN);
   }
@@ -80,7 +80,7 @@ class Transport::SocketPollData : public base::MessageLoopForIO::Watcher {
   // The socket file descriptor for the connection.
   curl_socket_t socket_fd_;
   // File descriptor watcher to notify us of asynchronous I/O on the FD.
-  base::MessageLoopForIO::FileDescriptorWatcher file_descriptor_watcher_;
+  base::MessagePumpForIO::FdWatchController file_descriptor_watcher_;
 
   DISALLOW_COPY_AND_ASSIGN(SocketPollData);
 };
@@ -206,7 +206,7 @@ std::shared_ptr<http::Connection> Transport::CreateConnection(
   return connection;
 }
 
-void Transport::RunCallbackAsync(const tracked_objects::Location& from_here,
+void Transport::RunCallbackAsync(const base::Location& from_here,
                                  const base::Closure& callback) {
   base::MessageLoopForIO::current()->task_runner()->PostTask(
       from_here, callback);
@@ -275,7 +275,7 @@ void Transport::SetLocalIpAddress(const std::string& ip_address) {
 }
 
 void Transport::AddEasyCurlError(brillo::ErrorPtr* error,
-                                 const tracked_objects::Location& location,
+                                 const base::Location& location,
                                  CURLcode code,
                                  CurlInterface* curl_interface) {
   brillo::Error::AddTo(error, location, "curl_easy_error",
@@ -284,7 +284,7 @@ void Transport::AddEasyCurlError(brillo::ErrorPtr* error,
 }
 
 void Transport::AddMultiCurlError(brillo::ErrorPtr* error,
-                                  const tracked_objects::Location& location,
+                                  const base::Location& location,
                                   CURLMcode code,
                                   CurlInterface* curl_interface) {
   brillo::Error::AddTo(error, location, "curl_multi_error",
@@ -367,16 +367,16 @@ int Transport::MultiSocketCallback(CURL* easy,
     return 0;
   }
 
-  base::MessageLoopForIO::Mode watch_mode = base::MessageLoopForIO::WATCH_READ;
+  base::MessagePumpForIO::Mode watch_mode = base::MessagePumpForIO::WATCH_READ;
   switch (what) {
     case CURL_POLL_IN:
-      watch_mode = base::MessageLoopForIO::WATCH_READ;
+      watch_mode = base::MessagePumpForIO::WATCH_READ;
       break;
     case CURL_POLL_OUT:
-      watch_mode = base::MessageLoopForIO::WATCH_WRITE;
+      watch_mode = base::MessagePumpForIO::WATCH_WRITE;
       break;
     case CURL_POLL_INOUT:
-      watch_mode = base::MessageLoopForIO::WATCH_READ_WRITE;
+      watch_mode = base::MessagePumpForIO::WATCH_READ_WRITE;
       break;
     default:
       LOG(FATAL) << "Unknown CURL socket action: " << what;

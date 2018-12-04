@@ -27,7 +27,7 @@ class MockTransport : public Transport {
                                            const std::string&,
                                            brillo::ErrorPtr*));
   MOCK_METHOD2(RunCallbackAsync,
-               void(const tracked_objects::Location&, const base::Closure&));
+               void(const base::Location&, const base::Closure&));
   MOCK_METHOD3(StartAsyncTransfer, RequestID(Connection*,
                                              const SuccessCallback&,
                                              const ErrorCallback&));

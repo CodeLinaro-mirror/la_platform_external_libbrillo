@@ -134,6 +134,7 @@ libbrillo_shared_libraries = ["libchrome"]
 cc_library {
     name: "libbrillo",
     host_supported: true,
+    recovery_available: true,
     srcs: libbrillo_core_sources,
     shared_libs: libbrillo_shared_libraries,
     static_libs: [
@@ -203,6 +204,7 @@ cc_library {
     export_include_dirs: ["."],
 
     host_supported: true,
+    recovery_available: true,
     target: {
         darwin: {
             enabled: false,

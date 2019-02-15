@@ -20,6 +20,7 @@
 #include <base/logging.h>
 #include <base/memory/ptr_util.h>
 #include <base/posix/eintr_wrapper.h>
+#include <base/posix/file_descriptor_shuffle.h>
 #include <base/process/process_metrics.h>
 #include <base/strings/string_number_conversions.h>
 #include <base/strings/string_util.h>
@@ -141,20 +142,6 @@ int ProcessImpl::GetPipe(int child_fd) {
 }
 
 bool ProcessImpl::PopulatePipeMap() {
-  // Verify all target fds are already open.  With this assumption we
-  // can be sure that the pipe fds created below do not overlap with
-  // any of the target fds which simplifies how we dup2 to them.  Note
-  // that multi-threaded code could close i->first between this loop
-  // and the next.
-  for (PipeMap::iterator i = pipe_map_.begin(); i != pipe_map_.end(); ++i) {
-    struct stat stat_buffer;
-    if (fstat(i->first, &stat_buffer) < 0) {
-      int saved_errno = errno;
-      LOG(ERROR) << "Unable to fstat fd " << i->first << ": " << saved_errno;
-      return false;
-    }
-  }
-
   for (PipeMap::iterator i = pipe_map_.begin(); i != pipe_map_.end(); ++i) {
     if (i->second.is_bound_) {
       // already have a parent fd, and the child fd gets dup()ed later.
@@ -243,24 +230,19 @@ bool ProcessImpl::Start() {
     if (close_unused_file_descriptors_) {
       CloseUnusedFileDescriptors();
     }
-    // Close parent's side of the child pipes. dup2 ours into place and
-    // then close our ends.
-    for (PipeMap::iterator i = pipe_map_.begin(); i != pipe_map_.end(); ++i) {
-      if (i->second.parent_fd_ != -1)
-        IGNORE_EINTR(close(i->second.parent_fd_));
-      // If we want to bind a fd to the same fd in the child, we don't need to
-      // close and dup2 it.
-      if (i->second.child_fd_ == i->first)
-        continue;
-      HANDLE_EINTR(dup2(i->second.child_fd_, i->first));
+
+    base::InjectiveMultimap fd_shuffle;
+    for (const auto& it : pipe_map_) {
+      // Close parent's side of the child pipes.
+      if (it.second.parent_fd_ != -1)
+        IGNORE_EINTR(close(it.second.parent_fd_));
+
+      fd_shuffle.emplace_back(it.second.child_fd_, it.first, true);
     }
-    // Defer the actual close() of the child fd until afterward; this lets the
-    // same child fd be bound to multiple fds using BindFd. Don't close the fd
-    // if it was bound to itself.
-    for (PipeMap::iterator i = pipe_map_.begin(); i != pipe_map_.end(); ++i) {
-      if (i->second.child_fd_ == i->first)
-        continue;
-      IGNORE_EINTR(close(i->second.child_fd_));
+
+    if (!base::ShuffleFileDescriptors(&fd_shuffle)) {
+      PLOG(ERROR) << "Could not shuffle file descriptors";
+      _exit(kErrorExitStatus);
     }
 
     if (!input_file_.empty()) {

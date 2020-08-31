@@ -16,6 +16,7 @@
 #include <memory>
 #include <string>
 
+#include <base/files/file_descriptor_watcher_posix.h>
 #include <base/location.h>
 #include <base/memory/weak_ptr.h>
 #include <base/message_loop/message_loop.h>
@@ -120,7 +121,7 @@ class BRILLO_EXPORT BaseMessageLoop : public MessageLoop {
 
     // Sets the closure to be run immediately whenever the file descriptor
     // becomes ready.
-    void RunImmediately() { immediate_run_= true; }
+    void RunImmediately() { immediate_run_ = true; }
 
    private:
     base::Location location_;
@@ -177,6 +178,9 @@ class BRILLO_EXPORT BaseMessageLoop : public MessageLoop {
   // this interface. If the instance was created from this object, this will
   // point to that instance.
   base::MessageLoopForIO* base_loop_;
+
+  // FileDescriptorWatcher for |base_loop_|. This is used in AlarmTimer.
+  std::unique_ptr<base::FileDescriptorWatcher> watcher_;
 
   // The RunLoop instance used to run the main loop from Run().
   base::RunLoop* base_run_loop_{nullptr};

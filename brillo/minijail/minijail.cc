@@ -11,6 +11,9 @@ using std::vector;
 
 namespace brillo {
 
+static base::LazyInstance<Minijail>::DestructorAtExit g_minijail
+    = LAZY_INSTANCE_INITIALIZER;
+
 Minijail::Minijail() {}
 
 Minijail::~Minijail() {}
@@ -63,6 +66,14 @@ void Minijail::UseCapabilities(struct minijail* jail, uint64_t capmask) {
 
 void Minijail::ResetSignalMask(struct minijail* jail) {
   minijail_reset_signal_mask(jail);
+}
+
+void Minijail::CloseOpenFds(struct minijail* jail) {
+  minijail_close_open_fds(jail);
+}
+
+void Minijail::PreserveFd(struct minijail* jail, int parent_fd, int child_fd) {
+  minijail_preserve_fd(jail, parent_fd, child_fd);
 }
 
 void Minijail::Enter(struct minijail* jail) {

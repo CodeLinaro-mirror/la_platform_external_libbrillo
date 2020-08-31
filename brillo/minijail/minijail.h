@@ -12,6 +12,9 @@ extern "C" {
 #include <sys/types.h>
 }
 
+#include <base/lazy_instance.h>
+#include <brillo/brillo_export.h>
+
 #include <libminijail.h>
 
 #include "base/macros.h"
@@ -19,7 +22,7 @@ extern "C" {
 namespace brillo {
 
 // A Minijail abstraction allowing Minijail mocking in tests.
-class Minijail {
+class BRILLO_EXPORT Minijail {
  public:
   virtual ~Minijail();
 
@@ -54,6 +57,12 @@ class Minijail {
 
   // minijail_reset_signal_mask
   virtual void ResetSignalMask(struct minijail* jail);
+
+  // minijail_close_open_fds
+  virtual void CloseOpenFds(struct minijail* jail);
+
+  // minijail_preserve_fd
+  virtual void PreserveFd(struct minijail* jail, int parent_fd, int child_fd);
 
   // minijail_enter
   virtual void Enter(struct minijail* jail);
@@ -108,6 +117,8 @@ class Minijail {
   Minijail();
 
  private:
+  friend base::LazyInstanceTraitsBase<Minijail>;
+
   DISALLOW_COPY_AND_ASSIGN(Minijail);
 };
 

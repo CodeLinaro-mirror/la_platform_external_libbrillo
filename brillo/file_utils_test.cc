@@ -13,6 +13,7 @@
 #include <base/files/file_util.h>
 #include <base/files/scoped_temp_dir.h>
 #include <base/rand_util.h>
+#include <base/stl_util.h>
 #include <base/strings/string_number_conversions.h>
 #include <gtest/gtest.h>
 
@@ -29,8 +30,8 @@ constexpr int kPermissions755 = S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
 std::string GetRandomSuffix() {
   const int kBufferSize = 6;
   unsigned char buffer[kBufferSize];
-  base::RandBytes(buffer, arraysize(buffer));
-  return base::HexEncode(buffer, arraysize(buffer));
+  base::RandBytes(buffer, base::size(buffer));
+  return base::HexEncode(buffer, base::size(buffer));
 }
 
 bool IsNonBlockingFD(int fd) {
@@ -341,6 +342,167 @@ TEST_F(FileUtilsTest,
   EXPECT_EQ(mode & ~mask, subdir_mode & 0777);
   const mode_t old_mask = umask(mask);
   umask(old_mask);
+}
+
+TEST_F(FileUtilsTest, ComputeDirectoryDiskUsageNormalRandomFile) {
+  // 2MB test file.
+  constexpr size_t kFileSize = 2 * 1024 * 1024;
+
+  const base::FilePath dirname(GetTempName());
+  EXPECT_TRUE(base::CreateDirectory(dirname));
+  const base::FilePath filename = dirname.Append("test.temp");
+
+  std::string file_content = base::RandBytesAsString(kFileSize);
+  EXPECT_TRUE(WriteStringToFile(filename, file_content));
+
+  int64_t result_usage = ComputeDirectoryDiskUsage(dirname);
+  int64_t result_size = base::ComputeDirectorySize(dirname);
+
+  // result_usage (what we are testing here) should be within +/-10% of ground
+  // truth. The variation is to account for filesystem overhead variations.
+  EXPECT_GT(result_usage, kFileSize / 10 * 9);
+  EXPECT_LT(result_usage, kFileSize / 10 * 11);
+
+  // result_usage should be close to result_size, because the test file is
+  // random so it's disk usage should be similar to apparent size.
+  EXPECT_GT(result_usage, result_size / 10 * 9);
+  EXPECT_LT(result_usage, result_size / 10 * 11);
+}
+
+TEST_F(FileUtilsTest, ComputeDirectoryDiskUsageDeepRandomFile) {
+  // 2MB test file.
+  constexpr size_t kFileSize = 2 * 1024 * 1024;
+
+  const base::FilePath dirname(GetTempName());
+  EXPECT_TRUE(base::CreateDirectory(dirname));
+  base::FilePath currentlevel = dirname;
+  for (int i = 0; i < 10; i++) {
+    base::FilePath nextlevel = currentlevel.Append("test.dir");
+    EXPECT_TRUE(base::CreateDirectory(nextlevel));
+    currentlevel = nextlevel;
+  }
+  const base::FilePath filename = currentlevel.Append("test.temp");
+
+  std::string file_content = base::RandBytesAsString(kFileSize);
+  EXPECT_TRUE(WriteStringToFile(filename, file_content));
+
+  int64_t result_usage = ComputeDirectoryDiskUsage(dirname);
+  int64_t result_size = base::ComputeDirectorySize(dirname);
+
+  // result_usage (what we are testing here) should be within +/-10% of ground
+  // truth. The variation is to account for filesystem overhead variations.
+  EXPECT_GT(result_usage, kFileSize / 10 * 9);
+  EXPECT_LT(result_usage, kFileSize / 10 * 11);
+
+  // result_usage should be close to result_size, because the test file is
+  // random so it's disk usage should be similar to apparent size.
+  EXPECT_GT(result_usage, result_size / 10 * 9);
+  EXPECT_LT(result_usage, result_size / 10 * 11);
+}
+
+TEST_F(FileUtilsTest, ComputeDirectoryDiskUsageHiddenRandomFile) {
+  // 2MB test file.
+  constexpr size_t kFileSize = 2 * 1024 * 1024;
+
+  const base::FilePath dirname(GetTempName());
+  EXPECT_TRUE(base::CreateDirectory(dirname));
+  // File name starts with a dot, so it's a hidden file.
+  const base::FilePath filename = dirname.Append(".test.temp");
+
+  std::string file_content = base::RandBytesAsString(kFileSize);
+  EXPECT_TRUE(WriteStringToFile(filename, file_content));
+
+  int64_t result_usage = ComputeDirectoryDiskUsage(dirname);
+  int64_t result_size = base::ComputeDirectorySize(dirname);
+
+  // result_usage (what we are testing here) should be within +/-10% of ground
+  // truth. The variation is to account for filesystem overhead variations.
+  EXPECT_GT(result_usage, kFileSize / 10 * 9);
+  EXPECT_LT(result_usage, kFileSize / 10 * 11);
+
+  // result_usage should be close to result_size, because the test file is
+  // random so it's disk usage should be similar to apparent size.
+  EXPECT_GT(result_usage, result_size / 10 * 9);
+  EXPECT_LT(result_usage, result_size / 10 * 11);
+}
+
+TEST_F(FileUtilsTest, ComputeDirectoryDiskUsageSparseFile) {
+  // 128MB sparse test file.
+  constexpr size_t kFileSize = 128 * 1024 * 1024;
+  constexpr size_t kFileSizeThreshold = 64 * 1024;
+
+  const base::FilePath dirname(GetTempName());
+  EXPECT_TRUE(base::CreateDirectory(dirname));
+  const base::FilePath filename = dirname.Append("test.temp");
+
+  int fd =
+      open(filename.value().c_str(), O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR);
+  EXPECT_NE(fd, -1);
+  // Calling ftruncate on an empty file will create a sparse file.
+  EXPECT_EQ(0, ftruncate(fd, kFileSize));
+
+  int64_t result_usage = ComputeDirectoryDiskUsage(dirname);
+  int64_t result_size = base::ComputeDirectorySize(dirname);
+
+  // result_usage (what we are testing here) should be less than
+  // kFileSizeThreshold, the threshold is to account for filesystem overhead
+  // variations.
+  EXPECT_LT(result_usage, kFileSizeThreshold);
+
+  // Since we are dealing with sparse files here, the apparent size should be
+  // much much larger than the actual disk usage.
+  EXPECT_LT(result_usage, result_size / 1000);
+}
+
+TEST_F(FileUtilsTest, ComputeDirectoryDiskUsageSymlinkFile) {
+  // 2MB test file.
+  constexpr size_t kFileSize = 2 * 1024 * 1024;
+
+  const base::FilePath dirname(GetTempName());
+  EXPECT_TRUE(base::CreateDirectory(dirname));
+  const base::FilePath filename = dirname.Append("test.temp");
+  const base::FilePath linkname = dirname.Append("test.link");
+
+  std::string file_content = base::RandBytesAsString(kFileSize);
+  EXPECT_TRUE(WriteStringToFile(filename, file_content));
+
+  // Create a symlink.
+  EXPECT_TRUE(base::CreateSymbolicLink(filename, linkname));
+
+  int64_t result_usage = ComputeDirectoryDiskUsage(dirname);
+
+  // result_usage (what we are testing here) should be within +/-10% of ground
+  // truth. The variation is to account for filesystem overhead variations.
+  // Note that it's not 2x kFileSize because symblink is not counted twice.
+  EXPECT_GT(result_usage, kFileSize / 10 * 9);
+  EXPECT_LT(result_usage, kFileSize / 10 * 11);
+}
+
+TEST_F(FileUtilsTest, ComputeDirectoryDiskUsageSymlinkDir) {
+  // 2MB test file.
+  constexpr size_t kFileSize = 2 * 1024 * 1024;
+
+  const base::FilePath parentname(GetTempName());
+  EXPECT_TRUE(base::CreateDirectory(parentname));
+  const base::FilePath dirname = parentname.Append("target.dir");
+  EXPECT_TRUE(base::CreateDirectory(dirname));
+  const base::FilePath linkname = parentname.Append("link.dir");
+
+  const base::FilePath filename = dirname.Append("test.temp");
+
+  std::string file_content = base::RandBytesAsString(kFileSize);
+  EXPECT_TRUE(WriteStringToFile(filename, file_content));
+
+  // Create a symlink.
+  EXPECT_TRUE(base::CreateSymbolicLink(dirname, linkname));
+
+  int64_t result_usage = ComputeDirectoryDiskUsage(dirname);
+
+  // result_usage (what we are testing here) should be within +/-10% of ground
+  // truth. The variation is to account for filesystem overhead variations.
+  // Note that it's not 2x kFileSize because symblink is not counted twice.
+  EXPECT_GT(result_usage, kFileSize / 10 * 9);
+  EXPECT_LT(result_usage, kFileSize / 10 * 11);
 }
 
 }  // namespace brillo

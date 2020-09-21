@@ -624,4 +624,75 @@ TEST_F(SafeFDTest, Rmdir_WrongType) {
   EXPECT_EQ(subdir.first.Rmdir(kFileName), SafeFD::Error::kWrongType);
 }
 
+TEST_F(SafeFDTest, Rmdir_Recursive_KeepGoing) {
+  ASSERT_TRUE(SetupSubdir());
+
+  ASSERT_TRUE(base::CreateDirectory(sub_dir_path_.Append(kSubdirName)));
+
+  // Give us something to iterate over.
+  constexpr int kNumSentinel = 25;
+  for (int i = 0; i < kNumSentinel; i++) {
+    SafeFD::SafeFDResult file =
+        root_.MakeFile(sub_dir_path_.Append(GetRandomSuffix()));
+    EXPECT_EQ(file.second, SafeFD::Error::kNoError);
+    ASSERT_TRUE(file.first.is_valid());
+  }
+
+  // Recursively delete with a max level that is too small. Capture errno.
+  SafeFD::Error result = root_.Rmdir(kSubdirName, true /*recursive*/,
+                                     1 /*max_depth*/, true /*keep_going*/);
+  int rmdir_errno = errno;
+
+  EXPECT_EQ(result, SafeFD::Error::kExceededMaximum);
+
+  // If we keep going, the last operation will be the post-order unlink of
+  // the top-level directory. This has to fail with ENOTEMPTY since we did
+  // not delete the too-deep sub-directories. This particular behavior
+  // should not be part of the API contract and this can be relaxed if the
+  // implementation is changed.
+  EXPECT_EQ(rmdir_errno, ENOTEMPTY);
+
+  // The deep directory must still exist.
+  ASSERT_TRUE(
+      base::DeleteFile(sub_dir_path_.Append(kSubdirName), false /*recursive*/));
+
+  // We cannot control the iteration order so even if we incorrectly
+  // stopped early the directory might still be empty if the deep
+  // directories were last in the iteration order. But a non-empty
+  // directory is always incorrect.
+  ASSERT_TRUE(base::IsDirectoryEmpty(sub_dir_path_));
+}
+
+TEST_F(SafeFDTest, Rmdir_Recursive_StopOnError) {
+  ASSERT_TRUE(SetupSubdir());
+
+  ASSERT_TRUE(base::CreateDirectory(sub_dir_path_.Append(kSubdirName)));
+
+  // Give us something to iterate over.
+  constexpr int kNumSentinel = 25;
+  for (int i = 0; i < kNumSentinel; i++) {
+    SafeFD::SafeFDResult file =
+        root_.MakeFile(sub_dir_path_.Append(GetRandomSuffix()));
+    EXPECT_EQ(file.second, SafeFD::Error::kNoError);
+    ASSERT_TRUE(file.first.is_valid());
+  }
+
+  // Recursively delete with a max level that is too small. Capture errno.
+  SafeFD::Error result = root_.Rmdir(kSubdirName, true /*recursive*/,
+                                     1 /*max_depth*/, false /*keep_going*/);
+  int rmdir_errno = errno;
+
+  EXPECT_EQ(result, SafeFD::Error::kExceededMaximum);
+
+  // If we stop on encountering a too-deep directory, we never actually
+  // make any libc calls that encounter errors. This particular behavior
+  // should not be part of the API contract and this can be relaxed if the
+  // implementation is changed.
+  EXPECT_EQ(rmdir_errno, 0);
+
+  // The deep directory must still exist.
+  ASSERT_TRUE(
+      base::DeleteFile(sub_dir_path_.Append(kSubdirName), false /*recursive*/));
+}
+
 }  // namespace brillo

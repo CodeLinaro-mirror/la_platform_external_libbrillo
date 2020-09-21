@@ -6,6 +6,7 @@
 
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <sys/sysmacros.h>
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -19,6 +20,7 @@
 #include <linux/major.h>
 #endif
 
+#include <utility>
 #include <vector>
 
 #include <base/bind.h>
@@ -50,12 +52,14 @@ BaseMessageLoop::BaseMessageLoop() {
   CHECK(!base::MessageLoop::current())
       << "You can't create a base::MessageLoopForIO when another "
          "base::MessageLoop is already created for this thread.";
-  owned_base_loop_.reset(new base::MessageLoopForIO);
+  owned_base_loop_.reset(new base::MessageLoopForIO());
   base_loop_ = owned_base_loop_.get();
+  watcher_ = std::make_unique<base::FileDescriptorWatcher>(base_loop_);
 }
 
 BaseMessageLoop::BaseMessageLoop(base::MessageLoopForIO* base_loop)
-    : base_loop_(base_loop) {}
+    : base_loop_(base_loop),
+      watcher_(std::make_unique<base::FileDescriptorWatcher>(base_loop_)) {}
 
 BaseMessageLoop::~BaseMessageLoop() {
   for (auto& io_task : io_tasks_) {
@@ -97,8 +101,7 @@ MessageLoop::TaskId BaseMessageLoop::PostDelayedTask(
   if (!base_scheduled)
     return MessageLoop::kTaskIdNull;
 
-  delayed_tasks_.emplace(task_id,
-                         DelayedTask{from_here, task_id, std::move(task)});
+  delayed_tasks_.emplace(task_id, DelayedTask{from_here, task_id, task});
   return task_id;
 }
 

@@ -91,8 +91,7 @@ class BRILLO_EXPORT MessageLoop {
                              WatchMode mode,
                              bool persistent,
                              const base::Closure& task) {
-    return WatchFileDescriptor(
-        base::Location(), fd, mode, persistent, task);
+    return WatchFileDescriptor(base::Location(), fd, mode, persistent, task);
   }
 
   // Cancel a scheduled task. Returns whether the task was canceled. For

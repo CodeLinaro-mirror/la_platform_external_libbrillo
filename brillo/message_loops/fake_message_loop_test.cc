@@ -15,7 +15,7 @@
 
 #include <brillo/message_loops/message_loop.h>
 
-using base::Bind;
+using base::BindOnce;
 using base::Time;
 using base::TimeDelta;
 using std::vector;
@@ -45,17 +45,18 @@ TEST_F(FakeMessageLoopTest, CancelTaskInvalidValuesTest) {
 
 TEST_F(FakeMessageLoopTest, PostDelayedTaskRunsInOrder) {
   vector<int> order;
-  auto callback = [](std::vector<int>* order, int value) {
-    order->push_back(value);
-  };
-  loop_->PostDelayedTask(Bind(callback, base::Unretained(&order), 1),
-                         TimeDelta::FromSeconds(1));
-  loop_->PostDelayedTask(Bind(callback, base::Unretained(&order), 4),
-                         TimeDelta::FromSeconds(4));
-  loop_->PostDelayedTask(Bind(callback, base::Unretained(&order), 3),
-                         TimeDelta::FromSeconds(3));
-  loop_->PostDelayedTask(Bind(callback, base::Unretained(&order), 2),
-                         TimeDelta::FromSeconds(2));
+  loop_->PostDelayedTask(
+      BindOnce([](vector<int>* order) { order->push_back(1); }, &order),
+      TimeDelta::FromSeconds(1));
+  loop_->PostDelayedTask(
+      BindOnce([](vector<int>* order) { order->push_back(4); }, &order),
+      TimeDelta::FromSeconds(4));
+  loop_->PostDelayedTask(
+      BindOnce([](vector<int>* order) { order->push_back(3); }, &order),
+      TimeDelta::FromSeconds(3));
+  loop_->PostDelayedTask(
+      BindOnce([](vector<int>* order) { order->push_back(2); }, &order),
+      TimeDelta::FromSeconds(2));
   // Run until all the tasks are run.
   loop_->Run();
   EXPECT_EQ((vector<int>{1, 2, 3, 4}), order);
@@ -82,34 +83,6 @@ TEST_F(FakeMessageLoopTest, PostDelayedTaskAdvancesTheTime) {
   EXPECT_TRUE(loop_->RunOnce(false));
   // The time should not change even if the callback is due in the past.
   EXPECT_EQ(start + TimeDelta::FromSeconds(3), clock_.Now());
-}
-
-TEST_F(FakeMessageLoopTest, WatchFileDescriptorWaits) {
-  int fd = 1234;
-  // We will simulate this situation. At the beginning, we will watch for a
-  // file descriptor that won't trigger for 10s. Then we will pretend it is
-  // ready after 10s and expect its callback to run just once.
-  int called = 0;
-  TaskId task_id = loop_->WatchFileDescriptor(
-      FROM_HERE, fd, MessageLoop::kWatchRead, false,
-      Bind([](int* called) { (*called)++; }, base::Unretained(&called)));
-  EXPECT_NE(MessageLoop::kTaskIdNull, task_id);
-
-  EXPECT_NE(MessageLoop::kTaskIdNull,
-            loop_->PostDelayedTask(Bind(&FakeMessageLoop::BreakLoop,
-                                        base::Unretained(loop_.get())),
-                                   TimeDelta::FromSeconds(10)));
-  EXPECT_NE(MessageLoop::kTaskIdNull,
-            loop_->PostDelayedTask(Bind(&FakeMessageLoop::BreakLoop,
-                                        base::Unretained(loop_.get())),
-                                   TimeDelta::FromSeconds(20)));
-  loop_->Run();
-  EXPECT_EQ(0, called);
-
-  loop_->SetFileDescriptorReadiness(fd, MessageLoop::kWatchRead, true);
-  loop_->Run();
-  EXPECT_EQ(1, called);
-  EXPECT_FALSE(loop_->CancelTask(task_id));
 }
 
 TEST_F(FakeMessageLoopTest, PendingTasksTest) {

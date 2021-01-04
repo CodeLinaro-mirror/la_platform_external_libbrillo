@@ -11,11 +11,13 @@
 #include <utility>
 #include <vector>
 
+#include <base/files/file_enumerator.h>
 #include <base/files/file_path.h>
 #include <base/files/file_util.h>
 #include <base/logging.h>
 #include <base/posix/eintr_wrapper.h>
 #include <base/rand_util.h>
+#include <base/stl_util.h>
 #include <base/strings/string_number_conversions.h>
 #include <base/strings/stringprintf.h>
 #include <base/time/time.h>
@@ -140,7 +142,7 @@ bool TouchFileInternal(const base::FilePath& path,
 std::string GetRandomSuffix() {
   const int kBufferSize = 6;
   unsigned char buffer[kBufferSize];
-  base::RandBytes(buffer, arraysize(buffer));
+  base::RandBytes(buffer, base::size(buffer));
   std::string suffix;
   for (int i = 0; i < kBufferSize; ++i) {
     int random_value = buffer[i] % (2 * 26 + 10);
@@ -503,6 +505,22 @@ bool WriteToFileAtomic(const base::FilePath& path,
   }
 
   return true;
+}
+
+int64_t ComputeDirectoryDiskUsage(const base::FilePath& root_path) {
+  constexpr size_t S_BLKSIZE = 512;
+  int64_t running_blocks = 0;
+  base::FileEnumerator file_iter(root_path, true,
+                                 base::FileEnumerator::FILES |
+                                     base::FileEnumerator::DIRECTORIES |
+                                     base::FileEnumerator::SHOW_SYM_LINKS);
+  while (!file_iter.Next().empty()) {
+    // st_blocks in struct stat is the number of S_BLKSIZE (512) bytes sized
+    // blocks occupied by this file.
+    running_blocks += file_iter.GetInfo().stat().st_blocks;
+  }
+  // Each block is S_BLKSIZE (512) bytes so *S_BLKSIZE.
+  return running_blocks * S_BLKSIZE;
 }
 
 }  // namespace brillo

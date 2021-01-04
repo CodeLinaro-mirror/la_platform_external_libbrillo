@@ -4,6 +4,7 @@
 
 #include <brillo/daemons/daemon.h>
 
+#include <signal.h>
 #include <sysexits.h>
 #include <time.h>
 
@@ -27,7 +28,7 @@ int Daemon::Run() {
     return exit_code;
 
   message_loop_.PostTask(
-      base::Bind(&Daemon::OnEventLoopStartedTask, base::Unretained(this)));
+      base::BindOnce(&Daemon::OnEventLoopStartedTask, base::Unretained(this)));
   message_loop_.Run();
 
   OnShutdown(&exit_code_);

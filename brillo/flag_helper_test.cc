@@ -8,6 +8,7 @@
 
 #include <base/command_line.h>
 #include <base/macros.h>
+#include <base/stl_util.h>
 #include <brillo/flag_helper.h>
 
 #include <gtest/gtest.h>
@@ -29,6 +30,8 @@ TEST_F(FlagHelperTest, Defaults) {
   DEFINE_int32(int32_1, INT32_MIN, "Test int32 flag");
   DEFINE_int32(int32_2, 0, "Test int32 flag");
   DEFINE_int32(int32_3, INT32_MAX, "Test int32 flag");
+  DEFINE_uint32(uint32_1, 0, "Test uint32 flag");
+  DEFINE_uint32(uint32_2, UINT32_MAX, "Test uint32 flag");
   DEFINE_int64(int64_1, INT64_MIN, "Test int64 flag");
   DEFINE_int64(int64_2, 0, "Test int64 flag");
   DEFINE_int64(int64_3, INT64_MAX, "Test int64 flag");
@@ -41,17 +44,19 @@ TEST_F(FlagHelperTest, Defaults) {
   DEFINE_string(string_2, "value", "Test string flag");
 
   const char* argv[] = {"test_program"};
-  base::CommandLine command_line(arraysize(argv), argv);
+  base::CommandLine command_line(base::size(argv), argv);
 
   brillo::FlagHelper::GetInstance()->set_command_line_for_testing(
       &command_line);
-  brillo::FlagHelper::Init(arraysize(argv), argv, "TestDefaultTrue");
+  brillo::FlagHelper::Init(base::size(argv), argv, "TestDefaultTrue");
 
   EXPECT_TRUE(FLAGS_bool1);
   EXPECT_FALSE(FLAGS_bool2);
   EXPECT_EQ(FLAGS_int32_1, INT32_MIN);
   EXPECT_EQ(FLAGS_int32_2, 0);
   EXPECT_EQ(FLAGS_int32_3, INT32_MAX);
+  EXPECT_EQ(FLAGS_uint32_1, 0);
+  EXPECT_EQ(FLAGS_uint32_2, UINT32_MAX);
   EXPECT_EQ(FLAGS_int64_1, INT64_MIN);
   EXPECT_EQ(FLAGS_int64_2, 0);
   EXPECT_EQ(FLAGS_int64_3, INT64_MAX);
@@ -74,6 +79,8 @@ TEST_F(FlagHelperTest, SetValueDoubleDash) {
   DEFINE_int32(int32_1, 1, "Test int32 flag");
   DEFINE_int32(int32_2, 1, "Test int32 flag");
   DEFINE_int32(int32_3, 1, "Test int32 flag");
+  DEFINE_uint32(uint32_1, 1, "Test uint32 flag");
+  DEFINE_uint32(uint32_2, 1, "Test uint32 flag");
   DEFINE_int64(int64_1, 1, "Test int64 flag");
   DEFINE_int64(int64_2, 1, "Test int64 flag");
   DEFINE_int64(int64_3, 1, "Test int64 flag");
@@ -93,6 +100,8 @@ TEST_F(FlagHelperTest, SetValueDoubleDash) {
                         "--int32_1=-2147483648",
                         "--int32_2=0",
                         "--int32_3=2147483647",
+                        "--uint32_1=0",
+                        "--uint32_2=4294967295",
                         "--int64_1=-9223372036854775808",
                         "--int64_2=0",
                         "--int64_3=9223372036854775807",
@@ -103,11 +112,11 @@ TEST_F(FlagHelperTest, SetValueDoubleDash) {
                         "--double_3=100.5",
                         "--string_1=",
                         "--string_2=value"};
-  base::CommandLine command_line(arraysize(argv), argv);
+  base::CommandLine command_line(base::size(argv), argv);
 
   brillo::FlagHelper::GetInstance()->set_command_line_for_testing(
       &command_line);
-  brillo::FlagHelper::Init(arraysize(argv), argv, "TestDefaultTrue");
+  brillo::FlagHelper::Init(base::size(argv), argv, "TestDefaultTrue");
 
   EXPECT_TRUE(FLAGS_bool1);
   EXPECT_FALSE(FLAGS_bool2);
@@ -116,6 +125,8 @@ TEST_F(FlagHelperTest, SetValueDoubleDash) {
   EXPECT_EQ(FLAGS_int32_1, INT32_MIN);
   EXPECT_EQ(FLAGS_int32_2, 0);
   EXPECT_EQ(FLAGS_int32_3, INT32_MAX);
+  EXPECT_EQ(FLAGS_uint32_1, 0);
+  EXPECT_EQ(FLAGS_uint32_2, UINT32_MAX);
   EXPECT_EQ(FLAGS_int64_1, INT64_MIN);
   EXPECT_EQ(FLAGS_int64_2, 0);
   EXPECT_EQ(FLAGS_int64_3, INT64_MAX);
@@ -136,6 +147,8 @@ TEST_F(FlagHelperTest, SetValueSingleDash) {
   DEFINE_int32(int32_1, 1, "Test int32 flag");
   DEFINE_int32(int32_2, 1, "Test int32 flag");
   DEFINE_int32(int32_3, 1, "Test int32 flag");
+  DEFINE_uint64(uint32_1, 1, "Test uint32 flag");
+  DEFINE_uint64(uint32_2, 1, "Test uint32 flag");
   DEFINE_int64(int64_1, 1, "Test int64 flag");
   DEFINE_int64(int64_2, 1, "Test int64 flag");
   DEFINE_int64(int64_3, 1, "Test int64 flag");
@@ -153,6 +166,8 @@ TEST_F(FlagHelperTest, SetValueSingleDash) {
                         "-int32_1=-2147483648",
                         "-int32_2=0",
                         "-int32_3=2147483647",
+                        "-uint32_1=0",
+                        "-uint32_2=4294967295",
                         "-int64_1=-9223372036854775808",
                         "-int64_2=0",
                         "-int64_3=9223372036854775807",
@@ -163,17 +178,19 @@ TEST_F(FlagHelperTest, SetValueSingleDash) {
                         "-double_3=100.5",
                         "-string_1=",
                         "-string_2=value"};
-  base::CommandLine command_line(arraysize(argv), argv);
+  base::CommandLine command_line(base::size(argv), argv);
 
   brillo::FlagHelper::GetInstance()->set_command_line_for_testing(
       &command_line);
-  brillo::FlagHelper::Init(arraysize(argv), argv, "TestDefaultTrue");
+  brillo::FlagHelper::Init(base::size(argv), argv, "TestDefaultTrue");
 
   EXPECT_TRUE(FLAGS_bool1);
   EXPECT_FALSE(FLAGS_bool2);
   EXPECT_EQ(FLAGS_int32_1, INT32_MIN);
   EXPECT_EQ(FLAGS_int32_2, 0);
   EXPECT_EQ(FLAGS_int32_3, INT32_MAX);
+  EXPECT_EQ(FLAGS_uint32_1, 0);
+  EXPECT_EQ(FLAGS_uint32_2, UINT32_MAX);
   EXPECT_EQ(FLAGS_int64_1, INT64_MIN);
   EXPECT_EQ(FLAGS_int64_2, 0);
   EXPECT_EQ(FLAGS_int64_3, INT64_MAX);
@@ -192,11 +209,11 @@ TEST_F(FlagHelperTest, DuplicateSetValue) {
   DEFINE_int32(int32_1, 0, "Test in32 flag");
 
   const char* argv[] = {"test_program", "--int32_1=5", "--int32_1=10"};
-  base::CommandLine command_line(arraysize(argv), argv);
+  base::CommandLine command_line(base::size(argv), argv);
 
   brillo::FlagHelper::GetInstance()->set_command_line_for_testing(
       &command_line);
-  brillo::FlagHelper::Init(arraysize(argv), argv, "TestDuplicateSetvalue");
+  brillo::FlagHelper::Init(base::size(argv), argv, "TestDuplicateSetvalue");
 
   EXPECT_EQ(FLAGS_int32_1, 10);
 }
@@ -206,11 +223,11 @@ TEST_F(FlagHelperTest, FlagTerminator) {
   DEFINE_int32(int32_1, 0, "Test int32 flag");
 
   const char* argv[] = {"test_program", "--int32_1=5", "--", "--int32_1=10"};
-  base::CommandLine command_line(arraysize(argv), argv);
+  base::CommandLine command_line(base::size(argv), argv);
 
   brillo::FlagHelper::GetInstance()->set_command_line_for_testing(
       &command_line);
-  brillo::FlagHelper::Init(arraysize(argv), argv, "TestFlagTerminator");
+  brillo::FlagHelper::Init(base::size(argv), argv, "TestFlagTerminator");
 
   EXPECT_EQ(FLAGS_int32_1, 5);
 }
@@ -220,13 +237,14 @@ TEST_F(FlagHelperTest, FlagTerminator) {
 TEST_F(FlagHelperTest, HelpMessage) {
   DEFINE_bool(bool_1, true, "Test bool flag");
   DEFINE_int32(int_1, 0, "Test int flag");
+  DEFINE_uint32(uint32_1, 0, "Test uint32 flag");
   DEFINE_int64(int64_1, 0, "Test int64 flag");
   DEFINE_uint64(uint64_1, 0, "Test uint64 flag");
   DEFINE_double(double_1, 0, "Test double flag");
   DEFINE_string(string_1, "", "Test string flag");
 
   const char* argv[] = {"test_program", "--int_1=value", "--help"};
-  base::CommandLine command_line(arraysize(argv), argv);
+  base::CommandLine command_line(base::size(argv), argv);
 
   brillo::FlagHelper::GetInstance()->set_command_line_for_testing(
       &command_line);
@@ -235,7 +253,7 @@ TEST_F(FlagHelperTest, HelpMessage) {
   stdout = stderr;
 
   ASSERT_EXIT(
-      brillo::FlagHelper::Init(arraysize(argv), argv, "TestHelpMessage"),
+      brillo::FlagHelper::Init(base::size(argv), argv, "TestHelpMessage"),
       ::testing::ExitedWithCode(EX_OK),
       "TestHelpMessage\n\n"
       "  --bool_1  \\(Test bool flag\\)  type: bool  default: true\n"
@@ -244,6 +262,7 @@ TEST_F(FlagHelperTest, HelpMessage) {
       "  --int64_1  \\(Test int64 flag\\)  type: int64  default: 0\n"
       "  --int_1  \\(Test int flag\\)  type: int  default: 0\n"
       "  --string_1  \\(Test string flag\\)  type: string  default: \"\"\n"
+      "  --uint32_1  \\(Test uint32 flag\\)  type: uint32  default: 0\n"
       "  --uint64_1  \\(Test uint64 flag\\)  type: uint64  default: 0\n");
 
   stdout = orig;
@@ -253,7 +272,7 @@ TEST_F(FlagHelperTest, HelpMessage) {
 // to exit with EX_USAGE error code and corresponding error message.
 TEST_F(FlagHelperTest, UnknownFlag) {
   const char* argv[] = {"test_program", "--flag=value"};
-  base::CommandLine command_line(arraysize(argv), argv);
+  base::CommandLine command_line(base::size(argv), argv);
 
   brillo::FlagHelper::GetInstance()->set_command_line_for_testing(
       &command_line);
@@ -261,7 +280,7 @@ TEST_F(FlagHelperTest, UnknownFlag) {
   FILE* orig = stdout;
   stdout = stderr;
 
-  ASSERT_EXIT(brillo::FlagHelper::Init(arraysize(argv), argv, "TestIntExit"),
+  ASSERT_EXIT(brillo::FlagHelper::Init(base::size(argv), argv, "TestIntExit"),
               ::testing::ExitedWithCode(EX_USAGE),
               "ERROR: unknown command line flag 'flag'");
 
@@ -274,7 +293,7 @@ TEST_F(FlagHelperTest, BoolParseError) {
   DEFINE_bool(bool_1, 0, "Test bool flag");
 
   const char* argv[] = {"test_program", "--bool_1=value"};
-  base::CommandLine command_line(arraysize(argv), argv);
+  base::CommandLine command_line(base::size(argv), argv);
 
   brillo::FlagHelper::GetInstance()->set_command_line_for_testing(
       &command_line);
@@ -283,7 +302,7 @@ TEST_F(FlagHelperTest, BoolParseError) {
   stdout = stderr;
 
   ASSERT_EXIT(
-      brillo::FlagHelper::Init(arraysize(argv), argv, "TestBoolParseError"),
+      brillo::FlagHelper::Init(base::size(argv), argv, "TestBoolParseError"),
       ::testing::ExitedWithCode(EX_DATAERR),
       "ERROR: illegal value 'value' specified for bool flag 'bool_1'");
 
@@ -296,7 +315,7 @@ TEST_F(FlagHelperTest, Int32ParseError) {
   DEFINE_int32(int_1, 0, "Test int flag");
 
   const char* argv[] = {"test_program", "--int_1=value"};
-  base::CommandLine command_line(arraysize(argv), argv);
+  base::CommandLine command_line(base::size(argv), argv);
 
   brillo::FlagHelper::GetInstance()->set_command_line_for_testing(
       &command_line);
@@ -304,11 +323,57 @@ TEST_F(FlagHelperTest, Int32ParseError) {
   FILE* orig = stdout;
   stdout = stderr;
 
-  ASSERT_EXIT(brillo::FlagHelper::Init(arraysize(argv),
-                                       argv,
-                                       "TestInt32ParseError"),
-              ::testing::ExitedWithCode(EX_DATAERR),
-              "ERROR: illegal value 'value' specified for int flag 'int_1'");
+  ASSERT_EXIT(
+      brillo::FlagHelper::Init(base::size(argv), argv, "TestInt32ParseError"),
+      ::testing::ExitedWithCode(EX_DATAERR),
+      "ERROR: illegal value 'value' specified for int flag 'int_1'");
+
+  stdout = orig;
+}
+
+// Test that when passing an incorrect/unparsable type to a command line flag,
+// the program exits with code EX_DATAERR and outputs a corresponding message.
+TEST_F(FlagHelperTest, Uint32ParseErrorUppperBound) {
+  DEFINE_uint32(uint32_1, 0, "Test uint32 flag");
+
+  // test with UINT32_MAX + 1
+  const char* argv[] = {"test_program", "--uint32_1=4294967296"};
+  base::CommandLine command_line(base::size(argv), argv);
+
+  brillo::FlagHelper::GetInstance()->set_command_line_for_testing(
+      &command_line);
+
+  FILE* orig = stdout;
+  stdout = stderr;
+
+  ASSERT_EXIT(
+      brillo::FlagHelper::Init(base::size(argv), argv, "TestUint32ParseError"),
+      ::testing::ExitedWithCode(EX_DATAERR),
+      "ERROR: illegal value '4294967296' specified for uint32 flag "
+      "'uint32_1'");
+
+  stdout = orig;
+}
+
+// Test that when passing an incorrect/unparsable type to a command line flag,
+// the program exits with code EX_DATAERR and outputs a corresponding message.
+TEST_F(FlagHelperTest, Uint32ParseErrorNegativeValue) {
+  DEFINE_uint32(uint32_1, 0, "Test uint32 flag");
+
+  const char* argv[] = {"test_program", "--uint32_1=-1"};
+  base::CommandLine command_line(base::size(argv), argv);
+
+  brillo::FlagHelper::GetInstance()->set_command_line_for_testing(
+      &command_line);
+
+  FILE* orig = stdout;
+  stdout = stderr;
+
+  ASSERT_EXIT(
+      brillo::FlagHelper::Init(base::size(argv), argv, "TestUint32ParseError"),
+      ::testing::ExitedWithCode(EX_DATAERR),
+      "ERROR: illegal value '-1' specified for uint32 flag "
+      "'uint32_1'");
 
   stdout = orig;
 }
@@ -319,7 +384,7 @@ TEST_F(FlagHelperTest, Int64ParseError) {
   DEFINE_int64(int64_1, 0, "Test int64 flag");
 
   const char* argv[] = {"test_program", "--int64_1=value"};
-  base::CommandLine command_line(arraysize(argv), argv);
+  base::CommandLine command_line(base::size(argv), argv);
 
   brillo::FlagHelper::GetInstance()->set_command_line_for_testing(
       &command_line);
@@ -328,7 +393,7 @@ TEST_F(FlagHelperTest, Int64ParseError) {
   stdout = stderr;
 
   ASSERT_EXIT(
-      brillo::FlagHelper::Init(arraysize(argv), argv, "TestInt64ParseError"),
+      brillo::FlagHelper::Init(base::size(argv), argv, "TestInt64ParseError"),
       ::testing::ExitedWithCode(EX_DATAERR),
       "ERROR: illegal value 'value' specified for int64 flag "
       "'int64_1'");
@@ -342,7 +407,7 @@ TEST_F(FlagHelperTest, UInt64ParseError) {
   DEFINE_uint64(uint64_1, 0, "Test uint64 flag");
 
   const char* argv[] = {"test_program", "--uint64_1=value"};
-  base::CommandLine command_line(arraysize(argv), argv);
+  base::CommandLine command_line(base::size(argv), argv);
 
   brillo::FlagHelper::GetInstance()->set_command_line_for_testing(
       &command_line);
@@ -351,7 +416,7 @@ TEST_F(FlagHelperTest, UInt64ParseError) {
   stdout = stderr;
 
   ASSERT_EXIT(
-      brillo::FlagHelper::Init(arraysize(argv), argv, "TestUInt64ParseError"),
+      brillo::FlagHelper::Init(base::size(argv), argv, "TestUInt64ParseError"),
       ::testing::ExitedWithCode(EX_DATAERR),
       "ERROR: illegal value 'value' specified for uint64 flag "
       "'uint64_1'");

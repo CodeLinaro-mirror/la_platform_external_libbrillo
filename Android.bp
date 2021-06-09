@@ -170,8 +170,8 @@ cc_library {
     shared_libs: libbrillo_shared_libraries,
     static_libs: [
         "libmodpb64",
-        "libgtest_prod",
     ],
+    header_libs: ["libgtest_prod_headers"],
     cflags: libbrillo_CFLAGS,
     export_include_dirs: ["."],
 
@@ -198,7 +198,7 @@ cc_library_shared {
         "libbrillo",
         "libutils",
     ],
-    static_libs: ["libgtest_prod"],
+    header_libs: ["libgtest_prod_headers"],
     cflags: libbrillo_CFLAGS,
     export_include_dirs: ["."],
 }
@@ -215,7 +215,7 @@ cc_library_shared {
         "libbrillo",
         "libminijail",
     ],
-    static_libs: ["libgtest_prod"],
+    header_libs: ["libgtest_prod_headers"],
     cflags: libbrillo_CFLAGS,
     export_include_dirs: ["."],
 }
@@ -230,7 +230,7 @@ cc_library {
         "libcrypto",
         "libssl",
     ],
-    static_libs: ["libgtest_prod"],
+    header_libs: ["libgtest_prod_headers"],
     cflags: libbrillo_CFLAGS,
     export_include_dirs: ["."],
 
@@ -256,7 +256,7 @@ cc_library_shared {
         "libbrillo-stream",
         "libcurl",
     ],
-    static_libs: ["libgtest_prod"],
+    header_libs: ["libgtest_prod_headers"],
     cflags: libbrillo_CFLAGS,
     export_include_dirs: ["."],
 
@@ -277,7 +277,7 @@ cc_library_shared {
     name: "libbrillo-policy",
     srcs: libbrillo_policy_sources,
     shared_libs: libbrillo_shared_libraries,
-    static_libs: ["libgtest_prod"],
+    header_libs: ["libgtest_prod_headers"],
     cflags: libbrillo_CFLAGS,
     export_include_dirs: ["."],
 }

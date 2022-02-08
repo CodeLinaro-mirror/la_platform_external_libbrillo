@@ -10,8 +10,9 @@
 #include <unistd.h>
 
 #include <base/logging.h>
+#ifndef USE_LE_MODE
 #include <gtest/gtest.h>
-
+#endif
 namespace brillo {
 
 const int ScopedPipe::kPipeSize = 4096;
@@ -23,7 +24,9 @@ ScopedPipe::ScopedPipe() {
   }
   reader = fds[0];
   writer = fds[1];
+#ifndef USE_LE_MODE
   EXPECT_EQ(kPipeSize, fcntl(writer, F_SETPIPE_SZ, kPipeSize));
+#endif
 }
 
 ScopedPipe::~ScopedPipe() {

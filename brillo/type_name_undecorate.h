@@ -9,7 +9,7 @@
 #include <typeinfo>
 
 #include <brillo/brillo_export.h>
-
+#ifndef USE_LE_MODE
 #if !defined(USE_RTTI_FOR_TYPE_TAGS) && !defined(__clang__)
 // When type information is used with RTTI disabled, we rely on
 // __PRETTY_FUNCTION__ macro for type tags. Unfortunately gcc and clang produce
@@ -20,7 +20,7 @@
 // and prevent this code from compiling with GCC to avoid hidden runtime errors.
 #error TypeInfo/Any with RTTI disabled is supported on clang compiler only.
 #endif
-
+#endif
 namespace brillo {
 
 template<typename T>

@@ -17,13 +17,17 @@ namespace {
 int stream_write(BIO* bio, const char* buf, int size) {
   brillo::Stream* stream = static_cast<brillo::Stream*>(bio->ptr);
   size_t written = 0;
+#ifndef USE_LE_MODE
   BIO_clear_retry_flags(bio);
+#endif
   if (!stream->WriteNonBlocking(buf, size, &written, nullptr))
     return -1;
 
   if (written == 0) {
     // Socket's output buffer is full, try again later.
+#ifndef USE_LE_MODE
     BIO_set_retry_write(bio);
+#endif
     return -1;
   }
   return base::checked_cast<int>(written);
@@ -32,7 +36,9 @@ int stream_write(BIO* bio, const char* buf, int size) {
 int stream_read(BIO* bio, char* buf, int size) {
   brillo::Stream* stream = static_cast<brillo::Stream*>(bio->ptr);
   size_t read = 0;
+#ifndef USE_LE_MODE
   BIO_clear_retry_flags(bio);
+#endif
   bool eos = false;
   if (!stream->ReadNonBlocking(buf, size, &read, &eos, nullptr))
     return -1;
@@ -40,7 +46,9 @@ int stream_read(BIO* bio, char* buf, int size) {
   if (read == 0 && !eos) {
     // If no data is available on the socket and it is still not closed,
     // ask OpenSSL to try again later.
+#ifndef USE_LE_MODE
     BIO_set_retry_read(bio);
+#endif
     return -1;
   }
   return base::checked_cast<int>(read);

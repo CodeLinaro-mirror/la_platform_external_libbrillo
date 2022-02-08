@@ -20,8 +20,9 @@
 #include <base/memory/weak_ptr.h>
 #include <base/message_loop/message_loop.h>
 #include <base/time/time.h>
+#ifndef USE_LE_MODE
 #include <gtest/gtest_prod.h>
-
+#endif
 #include <brillo/brillo_export.h>
 #include <brillo/message_loops/message_loop.h>
 
@@ -59,8 +60,9 @@ class BRILLO_EXPORT BaseMessageLoop : public MessageLoop {
   base::Closure QuitClosure() const;
 
  private:
+#ifndef USE_LE_MODE
   FRIEND_TEST(BaseMessageLoopTest, ParseBinderMinor);
-
+#endif
   static const int kInvalidMinor;
   static const int kUninitializedMinor;
 

@@ -13,8 +13,9 @@
 
 #include <brillo/brillo_export.h>
 #include <brillo/key_value_store.h>
+#ifndef USE_LE_MODE
 #include <gtest/gtest_prod.h>
-
+#endif
 namespace brillo {
 
 class BRILLO_EXPORT OsReleaseReader final {

@@ -16,8 +16,9 @@
 #include <base/strings/string_util.h>
 #include <base/strings/stringprintf.h>
 #include <brillo/brillo_export.h>
+#ifndef USE_LE_MODE
 #include <gtest/gtest_prod.h>
-
+#endif
 namespace brillo {
 // Manages a process.  Can create the process, attach to an existing
 // process by pid or pid file, and kill the process.  Upon destruction
@@ -203,8 +204,9 @@ class BRILLO_EXPORT ProcessImpl : public Process {
   bool PopulatePipeMap();
 
  private:
+#ifndef USE_LE_MODE
   FRIEND_TEST(ProcessTest, ResetPidByFile);
-
+#endif
   bool IsFileDescriptorInPipeMap(int fd) const;
   void CloseUnusedFileDescriptors();
 

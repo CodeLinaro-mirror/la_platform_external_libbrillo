@@ -127,12 +127,14 @@ class TlsStream::TlsStreamImpl {
 };
 
 TlsStream::TlsStreamImpl::TlsStreamImpl() {
+#ifndef USE_LE_MODE
   SSL_load_error_strings();
   SSL_library_init();
   if (ssl_ctx_private_data_index < 0) {
     ssl_ctx_private_data_index =
         SSL_CTX_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
   }
+#endif
 }
 
 TlsStream::TlsStreamImpl::~TlsStreamImpl() {
@@ -366,9 +368,10 @@ bool TlsStream::TlsStreamImpl::Init(StreamPtr socket,
 
   // Ask OpenSSL to validate the server host from the certificate to match
   // the expected host name we are given:
+#ifndef USE_LE_MODE
   X509_VERIFY_PARAM* param = SSL_CTX_get0_param(ctx_.get());
   X509_VERIFY_PARAM_set1_host(param, host.c_str(), host.size());
-
+#endif
   SSL_CTX_set_verify(ctx_.get(), SSL_VERIFY_PEER,
                      &TlsStreamImpl::OnCertVerifyResultsStatic);
 

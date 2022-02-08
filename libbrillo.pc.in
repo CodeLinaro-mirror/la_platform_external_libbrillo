@@ -1,8 +1,10 @@
-bslot=@BSLOT@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
 
 Name: libbrillo
 Description: brillo base library
-Version: ${bslot}
-Requires.private: @PRIVATE_PC@
-Cflags: -DUSE_RTTI_FOR_TYPE_TAGS
-Libs: -lbrillo-${bslot}
+Version: @VERSION@
+Libs: -L${libdir} -lbrillo
+Cflags: -I${includedir}/brillo

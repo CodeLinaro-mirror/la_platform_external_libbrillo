@@ -111,11 +111,11 @@ libbrillo_la_SOURCES += $(h_sources)
 #if USE_GLIB
 libbrillo_la_CFLAGS := $(AM_CFLAGS) -DUSE_GLIB @GLIB_CFLAGS@
 libbrillo_la_CPPFLAGS := $(AM_CPPFLAGS) -fpermissive -DUSE_GLIB @GLIB_CFLAGS@ 
-libbrillo_la_LIBADD := -lm -lssl -lcrypto -lchrome -lpthread -lbinderstreaming -lbssl @GLIB_LIBS@
+libbrillo_la_LIBADD := -lm -lssl -lcrypto -lchrome -lpthread -lbinderstreaming -lbssl -lcurl @GLIB_LIBS@
 #else
 libbrillo_la_CFLAGS := $(AM_CFLAGS)
 libbrillo_la_CPPFLAGS := $(AM_CPPFLAGS) -fpermissive
-libbrillo_la_LIBADD := -lm -lssl -lcrypto -lchrome -lpthread -lbssl -lbinderstreaming
+libbrillo_la_LIBADD := -lm -lssl -lcrypto -lchrome -lpthread -lbssl -lbinderstreaming -lcurl
 #endif
 
 brillo_includedir=$(includedir)/libbrillo

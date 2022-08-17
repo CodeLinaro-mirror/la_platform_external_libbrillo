@@ -28,7 +28,27 @@ namespace brillo {
 // contained file descriptor.
 class FileDescriptor : public FileStream::FileDescriptorInterface {
  public:
+#if USE_MTD
+  FileDescriptor(int fd, bool own, bool mtd, bool ubi) : fd_{fd}, own_{own}, mtd_{mtd}, ubi_{ubi} {
+    pages_read_ = 0;
+    if(mtd_){
+      mtd_info_t *mtd_info;
+      mtd_info = (mtd_info_t *) malloc(sizeof(mtd_info_t));
+      int ret = telaf_mtd_information(mtd_info);
+      if (ret != 0){
+        LOG(ERROR) << " FileStream::  get mtd info error  ";
+      }
+      total_blocks_number_ =  mtd_info->blk_num;
+      bad_blocks_number_ = mtd_info->bad_blk_num;
+      erase_size_ = mtd_info->erase_size;
+      write_size_ = mtd_info->write_size;
+    } else if (ubi_) {
+      LOG(INFO) << " FileStream:: get ubi info and fill info in ubi class members ";
+    }
+  }
+#else
   FileDescriptor(int fd, bool own) : fd_{fd}, own_{own} {}
+#endif
   ~FileDescriptor() override {
     if (IsOpen()) {
       Close();
@@ -39,7 +59,77 @@ class FileDescriptor : public FileStream::FileDescriptorInterface {
   bool IsOpen() const override { return fd_ >= 0; }
 
   ssize_t Read(void* buf, size_t nbyte) override {
+#if USE_MTD
+    ssize_t ret = -1;
+    if (mtd_ == 1){
+      // assumption nbyte is always multiple of erase size except for last read at image boundary
+      if(write_size_ == 0) {
+        LOG(ERROR) << " mtd info not available ";
+        return -1;
+      }
+      if (nbyte >= erase_size_) {
+        unsigned char dest[erase_size_];
+        int iter = nbyte/erase_size_;
+        int pages_read = pages_read_;
+        for(int i = 0 ; i < iter ; i++) {
+          memset(dest, 0, sizeof(dest));
+          ret = telaf_mtd_read_block (dest, pages_read + i, erase_size_);
+          if(ret != 0) {
+            LOG(ERROR) << " mtd read failed ";
+            return -1;
+          }
+          memcpy(reinterpret_cast<unsigned char*>(const_cast<void*>(buf)) + i*erase_size_, dest, erase_size_);
+          if ((pages_read == 0) && (i == 0)){
+            FILE *fp1;
+            fp1 = fopen( "/tmp/boot_b_first_leb" , "w" );
+            fwrite(dest , 1 , erase_size_ , fp1);
+            fclose(fp1);
+          }
+        }
+        pages_read_ += iter;
+      } else {
+        ret = telaf_mtd_read_block (reinterpret_cast<unsigned char*>(const_cast<void*>(buf)), pages_read_, nbyte);
+        if(ret != 0) {
+          LOG(ERROR) << " mtd read failed ";
+          return -1;
+        }
+        pages_read_ += nbyte;
+      }
+      return HANDLE_EINTR(nbyte);
+    } else if(ubi_ == 1) {
+
+      int iter = nbyte/16384;
+      unsigned char dest[16384];
+      memset(dest, 0, sizeof(dest));
+      int page_read = pages_read_;
+      for (int i=1 ; i <= iter ; i++){
+        memset(dest, 0, sizeof(dest));
+        ret = telaf_ubi_read (dest, page_read + (i-1)*16384, 16384);
+        if(ret != 0) {
+          LOG(ERROR) << " ubi read failed ";
+          return -1;
+        }
+        memcpy(reinterpret_cast<unsigned char*>(const_cast<void*>(buf)) + (i-1)*16384, dest, 16384);
+      }
+      if (nbyte%16384 != 0)
+      {
+        int to_read = nbyte - iter*16384;
+        memset(dest, 0, sizeof(dest));
+        ret = telaf_ubi_read (dest, page_read + iter*16384, 16384);
+        if(ret != 0) {
+          LOG(ERROR) << " ubi read failed ";
+          return -1;
+        }
+        memcpy(reinterpret_cast<unsigned char*>(const_cast<void*>(buf)) + iter*16384, dest, to_read);
+      }
+      pages_read_ += nbyte;
+      return HANDLE_EINTR(nbyte);
+    } else {
+      return HANDLE_EINTR(read(fd_, buf, nbyte));
+    }
+#else
     return HANDLE_EINTR(read(fd_, buf, nbyte));
+#endif
   }
 
   ssize_t Write(const void* buf, size_t nbyte) override {
@@ -76,6 +166,19 @@ class FileDescriptor : public FileStream::FileDescriptorInterface {
     // it before exiting.
     std::swap(fd, fd_);
     CancelPendingAsyncOperations();
+#if USE_MTD
+    if (mtd_) {
+      LOG(INFO) << " Close mtd device 1.1 ";
+       telaf_mtd_close();
+       total_blocks_number_ = 0;
+       bad_blocks_number_ = 0;
+       erase_size_ = 0;
+       write_size_ = 0;
+    } else if (ubi_) {
+      LOG(INFO) << " Close ubi device 1.2 ";
+      telaf_ubi_close();
+    }
+#endif
     return own_ ? IGNORE_EINTR(close(fd)) : 0;
   }
 
@@ -198,6 +301,15 @@ class FileDescriptor : public FileStream::FileDescriptorInterface {
   DataCallback read_data_callback_;
   DataCallback write_data_callback_;
 
+#if USE_MTD
+  bool mtd_;
+  bool ubi_;
+  uint32_t total_blocks_number_;
+  uint32_t bad_blocks_number_;
+  uint32_t erase_size_;
+  uint32_t write_size_;
+  int pages_read_;
+#endif
   // MessageLoop tasks monitoring read/write operations on the file descriptor.
   MessageLoop::TaskId read_watcher_{MessageLoop::kTaskIdNull};
   MessageLoop::TaskId write_watcher_{MessageLoop::kTaskIdNull};
@@ -239,6 +351,57 @@ StreamPtr FileStream::Open(const base::FilePath& path,
   }
 
   mode_t creation_mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
+#if USE_MTD
+  LOG(INFO) << " FileStream 1 " << path.value().c_str();
+  int fd = -1;
+  int ret = -1;
+  bool read_mtd = false;
+  bool read_ubi = false;
+  std::unique_ptr<FileDescriptorInterface> fd_interface;
+  LOG(INFO) << " FileStream 1 is mtd device ?:  " << IsMtd(path.value().c_str());
+  if(IsMtd(path.value().c_str())) {
+    LOG(INFO) << " FileStream 1 mtd device " << path.value().c_str();
+    ret = telaf_mtd_open (path.value().c_str());
+    if (ret != 0){
+      LOG(ERROR) << " FileStream::  open mtd error  ";
+      brillo::errors::system::AddSystemError(error, FROM_HERE, errno);
+      IGNORE_EINTR(close(fd));
+      return stream;
+    }
+    fd = 0;
+    read_mtd = true;
+  } else if (IsUbi(path.value().c_str())){
+    LOG(INFO) << " FileStream 1 ubi device " << path.value().c_str();
+    ret = telaf_ubi_open (path.value().c_str(), 1);
+    if (ret != 0){
+      LOG(ERROR) << " FileStream::  open ubi error  ";
+      brillo::errors::system::AddSystemError(error, FROM_HERE, errno);
+      IGNORE_EINTR(close(fd));
+      return stream;
+    }
+    read_ubi = true;
+    fd = 0;
+  } else {
+    fd = HANDLE_EINTR(open(path.value().c_str(), open_flags, creation_mode));
+  }
+  if (fd < 0) {
+    brillo::errors::system::AddSystemError(error, FROM_HERE, errno);
+    return stream;
+  }
+
+  if (!read_ubi){
+    if (HANDLE_EINTR(fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK)) < 0) {
+      brillo::errors::system::AddSystemError(error, FROM_HERE, errno);
+      IGNORE_EINTR(close(fd));
+      return stream;
+    }
+  }
+
+  LOG(INFO) << " FileStream:: create FileDescriptor path:   " << path.value().c_str();
+  fd_interface = std::unique_ptr<FileDescriptorInterface>{new FileDescriptor{fd, true, read_mtd, read_ubi}};
+  stream.reset(new FileStream{std::move(fd_interface), mode});
+  return stream;
+#else
   int fd = HANDLE_EINTR(open(path.value().c_str(), open_flags, creation_mode));
   if (fd < 0) {
     brillo::errors::system::AddSystemError(error, FROM_HERE, errno);
@@ -249,12 +412,11 @@ StreamPtr FileStream::Open(const base::FilePath& path,
     IGNORE_EINTR(close(fd));
     return stream;
   }
-
   std::unique_ptr<FileDescriptorInterface> fd_interface{
       new FileDescriptor{fd, true}};
-
   stream.reset(new FileStream{std::move(fd_interface), mode});
   return stream;
+#endif
 }
 
 StreamPtr FileStream::CreateTemporary(ErrorPtr* error) {
@@ -317,8 +479,13 @@ StreamPtr FileStream::FromFileDescriptor(int file_descriptor,
     }
   }
 
+#if USE_MTD
+  std::unique_ptr<FileDescriptorInterface> fd_interface{
+      new FileDescriptor{file_descriptor, own_descriptor, false, false}};
+#else
   std::unique_ptr<FileDescriptorInterface> fd_interface{
       new FileDescriptor{file_descriptor, own_descriptor}};
+#endif
 
   stream.reset(new FileStream{std::move(fd_interface), access_mode});
   return stream;
@@ -353,6 +520,53 @@ FileStream::FileStream(std::unique_ptr<FileDescriptorInterface> fd_interface,
 bool FileStream::IsOpen() const {
   return fd_interface_->IsOpen();
 }
+
+#if USE_MTD
+bool FileStream::IsMtd(const char* path) {
+    char mtd_no[32] = {"/dev/"};
+    int err = get_mtdno(path,(mtd_no+5));
+    if (err != 0) {
+      LOG(INFO) << " can-not open any such partition ";
+      return false;
+    }
+    int uid, vid;
+    char ubi_path[64];
+    LOG(INFO) << " IsMtd,  mtdno " << mtd_no;
+    std::string ubi_str(mtd_no);
+    LOG(INFO) << " IsMtd,  ubi_str " << ubi_str;
+    LOG(INFO) << " IsMtd  mtd no: " << std::stoi(ubi_str.substr(8, 2));
+    if (std::stoi(ubi_str.substr(8, 2)) > 35){
+      LOG(INFO) << mtd_no << " is ubi device " ;
+      return false;
+    } else {
+        LOG(INFO) << mtd_no << " is mtd device " ;
+      return true;
+    }
+}
+
+bool FileStream::IsUbi(const char* path) {
+
+    char mtd_no[32] = {"/dev/"};
+    int err = get_mtdno(path,(mtd_no+5));
+    if (err != 0) {
+      LOG(INFO) << " can-not open any such partition ";
+      return false;
+    }
+    int uid, vid;
+    char ubi_path[64];
+    LOG(INFO) << " IsUbi,  mtdno " << mtd_no;
+    std::string ubi_str(mtd_no);
+    LOG(INFO) << " IsUbi, ubi_str " << ubi_str;
+    LOG(INFO) << " IsUbi mtd no: " << std::stoi(ubi_str.substr(8, 2));
+    if (std::stoi(ubi_str.substr(8, 2)) > 35){
+      LOG(INFO) << mtd_no << " is ubi device " ;
+      return true;
+    } else {
+        LOG(INFO) << mtd_no << " is mtd device " ;
+      return false;
+    }
+}
+#endif
 
 bool FileStream::CanRead() const {
   return IsOpen() && stream_utils::IsReadAccessMode(access_mode_);

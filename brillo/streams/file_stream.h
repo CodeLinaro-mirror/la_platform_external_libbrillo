@@ -10,6 +10,12 @@
 #include <brillo/brillo_export.h>
 #include <brillo/streams/stream.h>
 
+#if USE_MTD
+extern "C" {
+#include "telaf-flash-access.h"
+}
+#endif
+
 namespace brillo {
 
 // FileStream class provides the implementation of brillo::Stream for files
@@ -98,6 +104,10 @@ class BRILLO_EXPORT FileStream : public Stream {
   bool CanWrite() const override;
   bool CanSeek() const override;
   bool CanGetSize() const override;
+#if USE_MTD
+  static bool IsMtd(const char* path);
+  static bool IsUbi(const char* path);
+#endif
 
   // == Stream size operations ================================================
   uint64_t GetSize() const override;

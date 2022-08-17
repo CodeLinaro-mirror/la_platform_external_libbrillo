@@ -38,6 +38,11 @@ AUTOMAKE_OPTIONS = subdir-objects
 
 AM_LDFLAGS := -shared -version-info 1:0:0
 
+if TARGET_NAND_BOOT
+AM_CFLAGS += -DUSE_MTD=1
+AM_CPPFLAGS += -DUSE_MTD=1
+endif
+
 
 libbrillo_core_la_SOURCES := brillo/backoff_entry.cc \
     brillo/data_encoding.cc \
@@ -117,6 +122,10 @@ libbrillo_la_CFLAGS := $(AM_CFLAGS)
 libbrillo_la_CPPFLAGS := $(AM_CPPFLAGS) -fpermissive
 libbrillo_la_LIBADD := -lm -lssl -lcrypto -lchrome -lpthread -lbssl -lbinderstreaming -lcurl
 #endif
+
+if !BUILD_HOST
+libbrillo_la_LIBADD += -ltelaf_flash_access
+endif
 
 brillo_includedir=$(includedir)/libbrillo
 brillo_include_HEADERS := brillo/flag_helper.h

@@ -17,6 +17,8 @@
 #include <brillo/streams/stream_errors.h>
 #include <brillo/streams/stream_utils.h>
 
+#define MTD_NAD_UBI                     37   // find alterative method to remove dependency of nad_ubi
+
 namespace brillo {
 
 // FileDescriptor is a helper class that serves two purposes:
@@ -535,7 +537,7 @@ bool FileStream::IsMtd(const char* path) {
     std::string ubi_str(mtd_no);
     LOG(INFO) << " IsMtd,  ubi_str " << ubi_str;
     LOG(INFO) << " IsMtd  mtd no: " << std::stoi(ubi_str.substr(8, 2));
-    if (std::stoi(ubi_str.substr(8, 2)) > 35){
+    if (std::stoi(ubi_str.substr(8, 2)) > MTD_NAD_UBI){
       LOG(INFO) << mtd_no << " is ubi device " ;
       return false;
     } else {
@@ -558,7 +560,7 @@ bool FileStream::IsUbi(const char* path) {
     std::string ubi_str(mtd_no);
     LOG(INFO) << " IsUbi, ubi_str " << ubi_str;
     LOG(INFO) << " IsUbi mtd no: " << std::stoi(ubi_str.substr(8, 2));
-    if (std::stoi(ubi_str.substr(8, 2)) > 35){
+    if (std::stoi(ubi_str.substr(8, 2)) > MTD_NAD_UBI){
       LOG(INFO) << mtd_no << " is ubi device " ;
       return true;
     } else {

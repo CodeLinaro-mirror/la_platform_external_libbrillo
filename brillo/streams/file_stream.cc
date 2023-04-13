@@ -36,6 +36,9 @@ class FileDescriptor : public FileStream::FileDescriptorInterface {
     if(mtd_){
       mtd_info_t *mtd_info;
       mtd_info = (mtd_info_t *) malloc(sizeof(mtd_info_t));
+      if(mtd_info == NULL) {
+        LOG(ERROR) << " FileStream::  get mtd info error  ";
+      }
       int ret = telaf_mtd_information(mtd_info);
       if (ret != 0){
         LOG(ERROR) << " FileStream::  get mtd info error  ";
@@ -84,6 +87,11 @@ class FileDescriptor : public FileStream::FileDescriptorInterface {
           if ((pages_read == 0) && (i == 0)){
             FILE *fp1;
             fp1 = fopen( "/tmp/boot_b_first_leb" , "w" );
+          if(fp1 == -1) {
+            LOG(ERROR) << " FileStream::  fopen error  ";
+            return -1;
+          }
+
             fwrite(dest , 1 , erase_size_ , fp1);
             fclose(fp1);
           }

@@ -17,7 +17,9 @@
 #include <brillo/streams/stream_errors.h>
 #include <brillo/streams/stream_utils.h>
 
-#define MTD_NAD_UBI                     37   // find alterative method to remove dependency of nad_ubi
+#if USE_MTD
+#define SYSTEM_UBI_MTD_NUM  "/sys/class/ubi/ubi0/mtd_num"
+#endif
 
 namespace brillo {
 
@@ -545,7 +547,16 @@ bool FileStream::IsMtd(const char* path) {
     std::string ubi_str(mtd_no);
     LOG(INFO) << " IsMtd,  ubi_str " << ubi_str;
     LOG(INFO) << " IsMtd  mtd no: " << std::stoi(ubi_str.substr(8, 2));
-    if (std::stoi(ubi_str.substr(8, 2)) > MTD_NAD_UBI){
+
+    int mtd_system_ubi =  get_value_from_file(SYSTEM_UBI_MTD_NUM);
+    if (mtd_system_ubi == -1) {
+      LOG(INFO) << " failed to get mtd no for system ubi partition ";
+      return false;
+    }
+
+    LOG(INFO) << " system ubi,  mtdno " << mtd_system_ubi;
+
+    if (std::stoi(ubi_str.substr(8, 2)) > mtd_system_ubi){
       LOG(INFO) << mtd_no << " is ubi device " ;
       return false;
     } else {
@@ -568,7 +579,15 @@ bool FileStream::IsUbi(const char* path) {
     std::string ubi_str(mtd_no);
     LOG(INFO) << " IsUbi, ubi_str " << ubi_str;
     LOG(INFO) << " IsUbi mtd no: " << std::stoi(ubi_str.substr(8, 2));
-    if (std::stoi(ubi_str.substr(8, 2)) > MTD_NAD_UBI){
+
+    int mtd_system_ubi =  get_value_from_file(SYSTEM_UBI_MTD_NUM);
+    if (mtd_system_ubi == -1) {
+      LOG(INFO) << " failed to get mtd no for system ubi partition ";
+      return false;
+    }
+    LOG(INFO) << " system ubi,  mtdno " << mtd_system_ubi;
+
+    if (std::stoi(ubi_str.substr(8, 2)) > mtd_system_ubi){
       LOG(INFO) << mtd_no << " is ubi device " ;
       return true;
     } else {

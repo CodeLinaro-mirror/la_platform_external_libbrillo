@@ -255,9 +255,10 @@ class TestSecureAllocator : public SecureAllocator<T> {
 TEST(SecureAllocator, ErasureOnDeallocation) {
   // Make sure that the contents are cleared on deallocation.
   TestSecureAllocator<char> e;
+  constexpr size_t test_string_sz = 15;
 
-  char *test_string_addr = e.allocate(15);
-  snprintf(test_string_addr, sizeof(test_string_addr), "Test String");
+  char *test_string_addr = e.allocate(test_string_sz);
+  snprintf(test_string_addr, test_string_sz, "Test String");
 
   // Deallocate memory; the mock class should check for cleared data.
   e.deallocate(test_string_addr, 15);

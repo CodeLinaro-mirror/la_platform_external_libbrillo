@@ -202,7 +202,7 @@ class BRILLO_EXPORT ProcessImpl : public Process {
     // Is this an input or output pipe from child's perspective.
     bool is_input_;
     // Is this a bound (pre-existing) file descriptor?
-    bool is_bound_;
+    bool is_bound_ = false;
   };
   typedef std::map<int, PipeInfo> PipeMap;
 
@@ -214,6 +214,7 @@ class BRILLO_EXPORT ProcessImpl : public Process {
 
   bool IsFileDescriptorInPipeMap(int fd) const;
   void CloseUnusedFileDescriptors();
+  void ExecChildProcess(char**);
 
   // Pid of currently managed process or 0 if no currently managed
   // process.  pid must not be modified except by calling
@@ -237,6 +238,8 @@ class BRILLO_EXPORT ProcessImpl : public Process {
   // parent process when starting the child process, which avoids leaking
   // unnecessary file descriptors to the child process.
   bool close_unused_file_descriptors_;
+  // Whether to create this process in a new PID namespace.
+  bool enter_new_pid_namespace_ = false;
 };
 
 }  // namespace brillo

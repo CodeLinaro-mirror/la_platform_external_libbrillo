@@ -53,7 +53,6 @@ namespace brillo {
 template <typename T>
 class BRILLO_PRIVATE SecureAllocator : public std::allocator<T> {
  public:
-  using typename std::allocator<T>::pointer;
   using typename std::allocator<T>::size_type;
   using typename std::allocator<T>::value_type;
 
@@ -75,8 +74,8 @@ class BRILLO_PRIVATE SecureAllocator : public std::allocator<T> {
   size_type max_size() const { return max_size_; }
 
   // Allocation: allocate ceil(size/pagesize) for holding the data.
-  pointer allocate(size_type n, pointer hint = nullptr) {
-    pointer buffer = nullptr;
+  value_type* allocate(size_type n, value_type* hint = nullptr) {
+    value_type* buffer = nullptr;
     // Check if n can be theoretically allocated.
     CHECK_LT(n, max_size());
 
@@ -97,7 +96,7 @@ class BRILLO_PRIVATE SecureAllocator : public std::allocator<T> {
     size_type buffer_size = CalculatePageAlignedBufferSize(n);
 
     // Memory locking granularity is per-page: mmap ceil(size/page size) pages.
-    buffer = reinterpret_cast<pointer>(
+    buffer = reinterpret_cast<value_type*>(
         mmap(nullptr, buffer_size, PROT_READ | PROT_WRITE,
              MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
     if (buffer == MAP_FAILED)
@@ -155,7 +154,7 @@ class BRILLO_PRIVATE SecureAllocator : public std::allocator<T> {
     clear_contents(p, sizeof(U));
   }
 
-  virtual void deallocate(pointer p, size_type n) {
+  virtual void deallocate(value_type* p, size_type n) {
     // Check if n can be theoretically deallocated.
     CHECK_LT(n, max_size());
 
@@ -182,7 +181,7 @@ class BRILLO_PRIVATE SecureAllocator : public std::allocator<T> {
 #endif
 
   // Zero-out all bytes in the allocated buffer.
-  virtual void __attribute_no_opt clear_contents(pointer v, size_type n) {
+  virtual void __attribute_no_opt clear_contents(value_type* v, size_type n) {
     if (!v)
       return;
     memset(v, 0, n);

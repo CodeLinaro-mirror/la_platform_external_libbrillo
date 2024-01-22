@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <stdint.h>
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -18,7 +19,6 @@
 #include <base/files/file_path.h>
 #include <base/files/file_util.h>
 #include <base/logging.h>
-#include <base/memory/ptr_util.h>
 #include <base/posix/eintr_wrapper.h>
 #include <base/posix/file_descriptor_shuffle.h>
 #include <base/process/process_metrics.h>
@@ -117,7 +117,7 @@ void ProcessImpl::ApplySyscallFilter(const std::string& /*path*/) {
 }
 
 void ProcessImpl::EnterNewPidNamespace() {
-  // No-op, since ProcessImpl does not support sandboxing.
+  enter_new_pid_namespace_ = true;
   return;
 }
 
@@ -203,8 +203,8 @@ bool ProcessImpl::Start() {
   if (arguments_.empty()) {
     return false;
   }
-  std::unique_ptr<char* []> argv =
-      std::make_unique<char* []>(arguments_.size() + 1);
+  std::unique_ptr<char*[]> argv =
+      std::make_unique<char*[]>(arguments_.size() + 1);
 
   for (size_t i = 0; i < arguments_.size(); ++i)
     argv[i] = const_cast<char*>(arguments_[i].c_str());
@@ -216,113 +216,133 @@ bool ProcessImpl::Start() {
     return false;
   }
 
-  pid_t pid = fork();
-  int saved_errno = errno;
-  if (pid < 0) {
-    LOG(ERROR) << "Fork failed: " << saved_errno;
-    Reset(0);
-    return false;
+  // 64K child stack size
+  constexpr size_t kStackSize = 64 * 1024;
+  // clone() expects a pointer which points to top most byte of the stack
+  auto stack = reinterpret_cast<char*>(mmap(nullptr,
+                                            kStackSize,
+                                            PROT_READ | PROT_WRITE,
+                                            MAP_ANON | MAP_PRIVATE,
+                                            -1,
+                                            0)) +
+               kStackSize;
+  struct State {
+    ProcessImpl* p;
+    char** argv;
+  } state{};
+  state.p = this;
+  state.argv = argv.get();
+  int flags = SIGCHLD;
+  if (enter_new_pid_namespace_) {
+    flags |= CLONE_NEWPID;
   }
+  int pid = clone(
+      [](void* arg) {
+        State* s = reinterpret_cast<State*>(arg);
+        s->p->ExecChildProcess(s->argv);
+        return 0;
+      },
+      stack,
+      flags,
+      &state);
 
-  if (pid == 0) {
-    // Executing inside the child process.
-    // Close unused file descriptors.
-    if (close_unused_file_descriptors_) {
-      CloseUnusedFileDescriptors();
-    }
-
-    base::InjectiveMultimap fd_shuffle;
-    for (const auto& it : pipe_map_) {
-      // Close parent's side of the child pipes.
-      if (it.second.parent_fd_ != -1)
-        IGNORE_EINTR(close(it.second.parent_fd_));
-
-      fd_shuffle.emplace_back(it.second.child_fd_, it.first, true);
-    }
-
-    if (!base::ShuffleFileDescriptors(&fd_shuffle)) {
-      PLOG(ERROR) << "Could not shuffle file descriptors";
-      _exit(kErrorExitStatus);
-    }
-
-    if (!input_file_.empty()) {
-      int input_handle =
-          HANDLE_EINTR(open(input_file_.c_str(),
-                            O_RDONLY | O_NOFOLLOW | O_NOCTTY));
-      if (input_handle < 0) {
-        PLOG(ERROR) << "Could not open " << input_file_;
-        // Avoid exit() to avoid atexit handlers from parent.
-        _exit(kErrorExitStatus);
-      }
-
-      // It's possible input_handle is already stdin. But if not, we need
-      // to dup into that file descriptor and close the original.
-      if (input_handle != STDIN_FILENO) {
-        if (HANDLE_EINTR(dup2(input_handle, STDIN_FILENO)) < 0) {
-          PLOG(ERROR) << "Could not dup fd to stdin for " << input_file_;
-          _exit(kErrorExitStatus);
-        }
-        IGNORE_EINTR(close(input_handle));
-      }
-    }
-
-    if (!output_file_.empty()) {
-      int output_handle = HANDLE_EINTR(open(
-          output_file_.c_str(), O_CREAT | O_WRONLY | O_TRUNC | O_NOFOLLOW,
-          0666));
-      if (output_handle < 0) {
-        PLOG(ERROR) << "Could not create " << output_file_;
-        // Avoid exit() to avoid atexit handlers from parent.
-        _exit(kErrorExitStatus);
-      }
-      HANDLE_EINTR(dup2(output_handle, STDOUT_FILENO));
-      HANDLE_EINTR(dup2(output_handle, STDERR_FILENO));
-      // Only close output_handle if it does not happen to be one of
-      // the two standard file descriptors we are trying to redirect.
-      if (output_handle != STDOUT_FILENO && output_handle != STDERR_FILENO) {
-        IGNORE_EINTR(close(output_handle));
-      }
-    }
-    if (gid_ != static_cast<gid_t>(-1) && setresgid(gid_, gid_, gid_) < 0) {
-      int saved_errno = errno;
-      LOG(ERROR) << "Unable to set GID to " << gid_ << ": " << saved_errno;
-      _exit(kErrorExitStatus);
-    }
-    if (uid_ != static_cast<uid_t>(-1) && setresuid(uid_, uid_, uid_) < 0) {
-      int saved_errno = errno;
-      LOG(ERROR) << "Unable to set UID to " << uid_ << ": " << saved_errno;
-      _exit(kErrorExitStatus);
-    }
-    if (!pre_exec_.Run()) {
-      LOG(ERROR) << "Pre-exec callback failed";
-      _exit(kErrorExitStatus);
-    }
-    // Reset signal mask for the child process if not inheriting signal mask
-    // from the parent process.
-    if (!inherit_parent_signal_mask_) {
-      sigset_t signal_mask;
-      CHECK_EQ(0, sigemptyset(&signal_mask));
-      CHECK_EQ(0, sigprocmask(SIG_SETMASK, &signal_mask, nullptr));
-    }
-    if (search_path_) {
-      execvp(argv[0], &argv[0]);
-    } else {
-      execv(argv[0], &argv[0]);
-    }
-    PLOG(ERROR) << "Exec of " << argv[0] << " failed";
-    _exit(kErrorExitStatus);
-  } else {
-    // Still executing inside the parent process with known child pid.
-    arguments_.clear();
-    UpdatePid(pid);
-    // Close our copy of child side pipes only if we created those pipes.
-    for (const auto& i : pipe_map_) {
-      if (!i.second.is_bound_) {
-        IGNORE_EINTR(close(i.second.child_fd_));
-      }
+  // Still executing inside the parent process with known child pid.
+  arguments_.clear();
+  UpdatePid(pid);
+  // Close our copy of child side pipes only if we created those pipes.
+  for (const auto& i : pipe_map_) {
+    if (!i.second.is_bound_) {
+      IGNORE_EINTR(close(i.second.child_fd_));
     }
   }
   return true;
+}
+
+void ProcessImpl::ExecChildProcess(char** argv) {
+  // Executing inside the child process.
+  // Close unused file descriptors.
+  if (close_unused_file_descriptors_) {
+    CloseUnusedFileDescriptors();
+  }
+
+  base::InjectiveMultimap fd_shuffle;
+  for (const auto& it : pipe_map_) {
+    // Close parent's side of the child pipes.
+    if (it.second.parent_fd_ != -1)
+      IGNORE_EINTR(close(it.second.parent_fd_));
+
+    fd_shuffle.emplace_back(it.second.child_fd_, it.first, true);
+  }
+
+  if (!base::ShuffleFileDescriptors(&fd_shuffle)) {
+    PLOG(ERROR) << "Could not shuffle file descriptors";
+    _exit(kErrorExitStatus);
+  }
+
+  if (!input_file_.empty()) {
+    int input_handle = HANDLE_EINTR(
+        open(input_file_.c_str(), O_RDONLY | O_NOFOLLOW | O_NOCTTY));
+    if (input_handle < 0) {
+      PLOG(ERROR) << "Could not open " << input_file_;
+      // Avoid exit() to avoid atexit handlers from parent.
+      _exit(kErrorExitStatus);
+    }
+
+    // It's possible input_handle is already stdin. But if not, we need
+    // to dup into that file descriptor and close the original.
+    if (input_handle != STDIN_FILENO) {
+      if (HANDLE_EINTR(dup2(input_handle, STDIN_FILENO)) < 0) {
+        PLOG(ERROR) << "Could not dup fd to stdin for " << input_file_;
+        _exit(kErrorExitStatus);
+      }
+      IGNORE_EINTR(close(input_handle));
+    }
+  }
+
+  if (!output_file_.empty()) {
+    int output_handle = HANDLE_EINTR(open(
+        output_file_.c_str(), O_CREAT | O_WRONLY | O_TRUNC | O_NOFOLLOW, 0666));
+    if (output_handle < 0) {
+      PLOG(ERROR) << "Could not create " << output_file_;
+      // Avoid exit() to avoid atexit handlers from parent.
+      _exit(kErrorExitStatus);
+    }
+    HANDLE_EINTR(dup2(output_handle, STDOUT_FILENO));
+    HANDLE_EINTR(dup2(output_handle, STDERR_FILENO));
+    // Only close output_handle if it does not happen to be one of
+    // the two standard file descriptors we are trying to redirect.
+    if (output_handle != STDOUT_FILENO && output_handle != STDERR_FILENO) {
+      IGNORE_EINTR(close(output_handle));
+    }
+  }
+  if (gid_ != static_cast<gid_t>(-1) && setresgid(gid_, gid_, gid_) < 0) {
+    int saved_errno = errno;
+    LOG(ERROR) << "Unable to set GID to " << gid_ << ": " << saved_errno;
+    _exit(kErrorExitStatus);
+  }
+  if (uid_ != static_cast<uid_t>(-1) && setresuid(uid_, uid_, uid_) < 0) {
+    int saved_errno = errno;
+    LOG(ERROR) << "Unable to set UID to " << uid_ << ": " << saved_errno;
+    _exit(kErrorExitStatus);
+  }
+  if (!pre_exec_.Run()) {
+    LOG(ERROR) << "Pre-exec callback failed";
+    _exit(kErrorExitStatus);
+  }
+  // Reset signal mask for the child process if not inheriting signal mask
+  // from the parent process.
+  if (!inherit_parent_signal_mask_) {
+    sigset_t signal_mask;
+    CHECK_EQ(0, sigemptyset(&signal_mask));
+    CHECK_EQ(0, sigprocmask(SIG_SETMASK, &signal_mask, nullptr));
+  }
+  if (search_path_) {
+    execvp(argv[0], &argv[0]);
+  } else {
+    execv(argv[0], &argv[0]);
+  }
+  PLOG(ERROR) << "Exec of " << argv[0] << " failed";
+  _exit(kErrorExitStatus);
 }
 
 int ProcessImpl::Wait() {

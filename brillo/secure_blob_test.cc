@@ -232,14 +232,13 @@ TEST_F(SecureBlobTest, HexStringToSecureBlob) {
 template <typename T>
 class TestSecureAllocator : public SecureAllocator<T> {
  public:
-  using typename SecureAllocator<T>::pointer;
   using typename SecureAllocator<T>::size_type;
   using typename SecureAllocator<T>::value_type;
 
   int GetErasedCount() { return erased_count; }
 
  protected:
-  void clear_contents(pointer p, size_type n) override {
+  void clear_contents(value_type* p, size_type n) override {
     SecureAllocator<T>::clear_contents(p, n);
     unsigned char *v = reinterpret_cast<unsigned char*>(p);
     for (int i = 0; i < n; i++) {

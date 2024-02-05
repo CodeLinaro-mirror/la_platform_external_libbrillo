@@ -4,6 +4,10 @@
 
 #include "brillo/process.h"
 
+#ifdef __BIONIC__
+#include <android/fdsan.h>
+#endif
+
 #include <fcntl.h>
 #include <signal.h>
 #include <stdint.h>
@@ -37,11 +41,9 @@ bool ReturnTrue() {
   return true;
 }
 
-Process::Process() {
-}
+Process::Process() {}
 
-Process::~Process() {
-}
+Process::~Process() {}
 
 bool Process::ProcessExists(pid_t pid) {
   return base::DirectoryExists(
@@ -55,8 +57,7 @@ ProcessImpl::ProcessImpl()
       pre_exec_(base::Bind(&ReturnTrue)),
       search_path_(false),
       inherit_parent_signal_mask_(false),
-      close_unused_file_descriptors_(false) {
-}
+      close_unused_file_descriptors_(false) {}
 
 ProcessImpl::~ProcessImpl() {
   Reset(0);
@@ -167,8 +168,7 @@ bool ProcessImpl::PopulatePipeMap() {
 
 bool ProcessImpl::IsFileDescriptorInPipeMap(int fd) const {
   for (const auto& pipe : pipe_map_) {
-    if (fd == pipe.second.parent_fd_ ||
-        fd == pipe.second.child_fd_ ||
+    if (fd == pipe.second.parent_fd_ || fd == pipe.second.child_fd_ ||
         fd == pipe.first) {
       return true;
     }
@@ -259,6 +259,11 @@ bool ProcessImpl::Start() {
 }
 
 void ProcessImpl::ExecChildProcess(char** argv) {
+#ifdef __BIONIC__
+  // Disable fdsan and fdtrack post-fork, so we don't falsely trigger on
+  // processes that fork, close all of their fds, and then exec.
+  android_fdsan_set_error_level(ANDROID_FDSAN_ERROR_LEVEL_DISABLED);
+#endif
   // Executing inside the child process.
   // Close unused file descriptors.
   if (close_unused_file_descriptors_) {
@@ -361,8 +366,8 @@ int ProcessImpl::Wait() {
   // kill the process that has just exited.
   UpdatePid(0);
   if (!WIFEXITED(status)) {
-    DCHECK(WIFSIGNALED(status)) << old_pid
-                                << " neither exited, nor died on a signal?";
+    DCHECK(WIFSIGNALED(status))
+        << old_pid << " neither exited, nor died on a signal?";
     LOG(ERROR) << "Process " << old_pid
                << " did not exit normally: " << WTERMSIG(status);
     return -1;

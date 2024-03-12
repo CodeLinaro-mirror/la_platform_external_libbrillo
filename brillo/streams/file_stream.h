@@ -12,7 +12,12 @@
 
 #if USE_MTD
 extern "C" {
+#if USE_TELAF
 #include "telaf-flash-access.h"
+#else
+#include "nad-mtd-al.h"
+#include "nad-ubi-al.h"
+#endif
 }
 #endif
 
@@ -58,6 +63,7 @@ class BRILLO_EXPORT FileStream : public Stream {
                                     base::TimeDelta timeout,
                                     AccessMode* out_mode) = 0;
     virtual void CancelPendingAsyncOperations() = 0;
+    bool mtd_read;
   };
 
   // == Construction ==========================================================
@@ -107,6 +113,10 @@ class BRILLO_EXPORT FileStream : public Stream {
 #if USE_MTD
   static bool IsMtd(const char* path);
   static bool IsUbi(const char* path);
+#if !USE_TELAF
+  static nad_mtd_hndl_t *NadMtdHandler(const char *dev_node_name);
+  static nad_ubi_hndl_t *NadUbiHandler(const char *dev_node_name);
+#endif
 #endif
 
   // == Stream size operations ================================================

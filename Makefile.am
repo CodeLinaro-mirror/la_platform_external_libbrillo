@@ -43,6 +43,10 @@ AM_CFLAGS += -DUSE_MTD=1
 AM_CPPFLAGS += -DUSE_MTD=1
 endif
 
+if TELAF
+AM_CFLAGS += -DUSE_TELAF=1
+AM_CPPFLAGS += -DUSE_TELAF=1
+endif
 
 libbrillo_core_la_SOURCES := brillo/backoff_entry.cc \
     brillo/data_encoding.cc \
@@ -124,7 +128,11 @@ libbrillo_la_LIBADD := -lm -lssl -lcrypto -lchrome -lpthread -lbinderstreaming -
 #endif
 
 if !BUILD_HOST
+if TELAF
 libbrillo_la_LIBADD += -ltelaf_flash_access
+else
+libbrillo_la_LIBADD += -lnad_mtd_al -lnad_ubi_al
+endif
 endif
 
 brillo_includedir=$(includedir)/libbrillo

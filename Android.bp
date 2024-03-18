@@ -171,7 +171,9 @@ cc_library {
     static_libs: [
         "libmodpb64",
     ],
-    header_libs: ["libgtest_prod_headers"],
+    header_libs: [
+        "libgtest_prod_headers",
+    ],
     cflags: libbrillo_CFLAGS,
     export_include_dirs: ["."],
 

@@ -401,7 +401,7 @@ StreamPtr FileStream::Open(const base::FilePath& path,
     return stream;
   }
 
-  if (!read_ubi){
+  if (fd > 0 && !read_ubi){
     if (HANDLE_EINTR(fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK)) < 0) {
       brillo::errors::system::AddSystemError(error, FROM_HERE, errno);
       IGNORE_EINTR(close(fd));

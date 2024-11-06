@@ -537,13 +537,15 @@ StreamPtr FileStream::Open(const base::FilePath& path,
     read_mtd = true;
 #else
      hndl = NadMtdHandler(path.value().c_str());
-     LOG(INFO) << " FileStream::  open mtdhandler  " << hndl->info.writesize;
-     //std::unique_ptr<FileDescriptorInterface> fd_interface{
-     // new FileDescriptor{file_descriptor, own_descriptor}};
-     //nad_mtd_ctx_.reset(NadMtdHandler(path.value().c_str()));
-     //nad_mtd_hndl_t *hndl1 = nad_mtd_ctx_.get();
-     fd =  hndl->fd;
-     read_mtd = true;
+     if (hndl != NULL){
+         LOG(INFO) << " FileStream::  open mtdhandler  " << hndl->info.writesize;
+         //std::unique_ptr<FileDescriptorInterface> fd_interface{
+         // new FileDescriptor{file_descriptor, own_descriptor}};
+         //nad_mtd_ctx_.reset(NadMtdHandler(path.value().c_str()));
+         //nad_mtd_hndl_t *hndl1 = nad_mtd_ctx_.get();
+         fd =  hndl->fd;
+         read_mtd = true;
+     }
 #endif
   } else if (IsUbi(path.value().c_str())){
    LOG(INFO) << " FileStream ubi device " << path.value().c_str();
@@ -559,11 +561,13 @@ StreamPtr FileStream::Open(const base::FilePath& path,
     fd = 0;
 #else
      LOG(INFO) << " FileStream 1 ubi device ";
-     hndlubi = NadUbiHandler(path.value().c_str()); 
-     //hndlubi = NadUbiHandler("/dev/ubi0_1"); 
-     fd =  hndlubi->fd;
-     read_ubi = true;
-     LOG(INFO) << " FileStream::  open ubihandler  " << hndlubi->vol_info.leb_size;
+     hndlubi = NadUbiHandler(path.value().c_str());
+     //hndlubi = NadUbiHandler("/dev/ubi0_1");
+     if (hndlubi != NULL){
+         fd =  hndlubi->fd;
+         read_ubi = true;
+         LOG(INFO) << " FileStream::  open ubihandler  " << hndlubi->vol_info.leb_size;
+     }
 #endif
   } else {
     fd = HANDLE_EINTR(open(path.value().c_str(), open_flags, creation_mode));

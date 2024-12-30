@@ -548,6 +548,12 @@ StreamPtr FileStream::Open(const base::FilePath& path,
     read_mtd = true;
 #else
      hndl = NadMtdHandler(path.value().c_str());
+     if(hndl == NULL){
+       LOG(ERROR) << " FileStream:: failed opening mtdhandler ";
+       brillo::errors::system::AddSystemError(error, FROM_HERE, errno);
+       return stream;
+     }
+
      LOG(INFO) << " FileStream::  open mtdhandler  " << hndl->info.writesize;
      //std::unique_ptr<FileDescriptorInterface> fd_interface{
      // new FileDescriptor{file_descriptor, own_descriptor}};
@@ -570,7 +576,13 @@ StreamPtr FileStream::Open(const base::FilePath& path,
     fd = 0;
 #else
      LOG(INFO) << " FileStream 1 ubi device ";
-     hndlubi = NadUbiHandler(path.value().c_str()); 
+     hndlubi = NadUbiHandler(path.value().c_str());
+     if (hndlubi == NULL) {
+       LOG(ERROR) << " FileStream:: failed opening ubihandler ";
+       brillo::errors::system::AddSystemError(error, FROM_HERE, errno);
+       return stream;
+     }
+
      //hndlubi = NadUbiHandler("/dev/ubi0_1"); 
      fd =  hndlubi->fd;
      read_ubi = true;

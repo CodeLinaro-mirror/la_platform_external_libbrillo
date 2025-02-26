@@ -1,6 +1,10 @@
 // Copyright 2015 The Chromium OS Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+//
+// Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
+// Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+// SPDX-License-Identifier: BSD-3-Clause-Clear
 
 #include <brillo/streams/file_stream.h>
 
@@ -212,6 +216,7 @@ class FileDescriptor : public FileStream::FileDescriptorInterface {
       memcpy(reinterpret_cast<unsigned char*>(const_cast<void*>(buf)), dest, nbyte);
       pages_read_ += nbyte;
       LOG(INFO) << " read from ubi device  pages_read_ after reading " << pages_read_;
+      free(dest);
       return HANDLE_EINTR(nbyte);
 #endif
     } else {

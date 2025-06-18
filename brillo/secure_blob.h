@@ -2,12 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// Changes from Qualcomm Technologies, Inc. are provided under the following license:
+// Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+// SPDX-License-Identifier: BSD-3-Clause-Clear
+
 #ifndef LIBBRILLO_BRILLO_SECURE_BLOB_H_
 #define LIBBRILLO_BRILLO_SECURE_BLOB_H_
 
 #include <string>
 #include <vector>
-
+#include <cstdint>
 #include <brillo/brillo_export.h>
 
 namespace brillo {

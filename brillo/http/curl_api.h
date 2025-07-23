@@ -2,17 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// Changes from Qualcomm Technologies, Inc. are provided under the following license:
-// Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
-// SPDX-License-Identifier: BSD-3-Clause-Clear
-
 #ifndef LIBBRILLO_BRILLO_HTTP_CURL_API_H_
 #define LIBBRILLO_BRILLO_HTTP_CURL_API_H_
 
 #include <curl/curl.h>
 
 #include <string>
-#include <cstdint>
+
 #include <base/macros.h>
 #include <brillo/brillo_export.h>
 

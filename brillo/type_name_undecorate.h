@@ -2,12 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// Changes from Qualcomm Technologies, Inc. are provided under the following license:
+// Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+// SPDX-License-Identifier: BSD-3-Clause-Clear
+
 #ifndef LIBBRILLO_BRILLO_TYPE_NAME_UNDECORATE_H_
 #define LIBBRILLO_BRILLO_TYPE_NAME_UNDECORATE_H_
 
 #include <string>
 #include <typeinfo>
-
+#include <cstdint>
 #include <brillo/brillo_export.h>
 #ifndef USE_LE_MODE
 #if !defined(USE_RTTI_FOR_TYPE_TAGS) && !defined(__clang__)

@@ -283,6 +283,7 @@ class FileDescriptor : public FileStream::FileDescriptorInterface {
        write_size_ = 0;
 #else
       nad_mtd_close(mtd_hndl_);
+      free(mtd_hndl_);
 #endif
     } else if (ubi_) {
       LOG(INFO) << " Close ubi device 1.2 ";
@@ -290,6 +291,7 @@ class FileDescriptor : public FileStream::FileDescriptorInterface {
       telaf_ubi_close();
 #else
       nad_ubi_close(ubi_hndl_);
+      free(ubi_hndl_);
 #endif
     } else {
       LOG(INFO) << " Close ";
